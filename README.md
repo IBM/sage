@@ -1,6 +1,6 @@
 # sage-data-pipeline
 
-This project is a data pipeline framework and practical examples for generating/processing fine-tuning data for various purposes.
+This project is a data pipeline framework and practical examples for generating/processing task data like the fine-tuning data for various purposes.
 
 The pipeline framework utilizes Ansible Risk Insight to parse Ansible content in YAML files (or prompt string in an existing FT data) and to apply configured rules for processing data depending on use-cases.
 
@@ -18,7 +18,9 @@ You can find some exmaples use-cases in [examples](./examples/).
 
 ### 1. Generate fine-tuning data from source directories
 
-By inputting a path list of source directories (roles, collections, projects and etc.), the pipeline executes ARI scan for them and the rule generate FT data (each line is a task data scanned by ARI in JSON format).
+By inputting a path list of source directories (roles, collections, projects and etc.), the pipeline executes ARI scan for them and the rules generate the FT data for the scanned Ansible objects.
+
+Each line is a task data processed by the rules in JSON format like the "original" FT data.
 
 ### 2. Detect deprecated modules in an existing FT data
 

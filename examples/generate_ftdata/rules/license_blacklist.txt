@@ -1,0 +1,78 @@
+nan
+'["BSD-3-Clause (default)"]'
+'["SSPL-1.0"]'
+'2-BST'
+'All components of this product are Copyright (c) 2016 New Relic
+'All components of this product are Copyright (c) 2020 New Relic
+'all rights reserved'
+'aryanraj.org@ar913100'
+'as-is'
+'bakeami'
+'BDS'
+'BSD-3-Clause-Clear'
+'CISCO SAMPLE CODE LICENSE'
+'COPYING'
+'Copyleft'
+'Foo'
+'FREE
+'Free'
+'license (BE
+'license (Goaccess)'
+'license (GPL-23)'
+'license free'
+'license-1'
+'N/A'
+'open source'
+'opensource'
+'PIPO'
+'proprietary'
+'see license.md'
+'see LICENSE.txt'
+'See README.md'
+'Soul'
+'TBD'
+'test license'
+'Unilicense'
+'Unknown'
+'Unlicense'
+'unlicensed'
+'WCL license'
+['GPL-3.0-only', 'BSD-2-Clause-FreeBSD']
+<license_name>
+Academic Free License v3.0
+All components of this product are Copyright (c) 2
+APL 2.0
+APLv2
+BSD (default)
+BSD 3-Clause "New" or "Revised" License
+BSD 3-Clause Clear License
+BSD 4-Clause "Original" or "Old" License
+BSD-3-Clause (default)
+CC-BY-NC-ND-4.0
+CC-BY-NC-SA-4.0
+cloudwatch-log-agent
+False
+FREE, NO LICENSE
+GFDL
+httpd
+https://cyverse.org/license
+Imperva-Community Developer License
+license (AGPLv2, CC-BY, etc)
+license (ALv2)
+license (ASLv2)
+license (BE, ANS, OUD)
+license (GPL-2.0-or-later, MIT, etc)
+license (GPLv2, CC-BY, etc)
+license (GPLv2, CC-BY, etc) - BSD
+license (GPLv2, CC-BY, etc) - GPLv3
+license (GPLv3, CC-BY, etc)
+license (MIT, etc)
+license (MIT, MIT, GPLv2, CC-BY, etc)
+MIT, Papercut-https://www.papercut.com/products/ng
+MLP2
+NO LICENSE PROVIDED
+Other
+provision-ec2
+see license in nct_license.txt
+SSPL-1.0
+STEM

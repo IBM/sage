@@ -18,7 +18,7 @@ You can find some exmaples use-cases in [examples](./examples/).
 
 ### 1. Generate fine-tuning data from source directories
 
-By inputting a path list of source directories (roles, collections, projects and etc.), the pipeline executes ARI scan for them and the rules generate the FT data for the scanned Ansible objects.
+By inputting a path list of source directories (roles, collections, projects and etc.), the pipeline executes ARI scan for them and the ARI rules (found [here](examples/generate_ftdata/rules/)) generate the FT data for the scanned Ansible objects.
 
 Each line is a task data processed by the rules in JSON format like the "original" FT data.
 

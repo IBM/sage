@@ -30,4 +30,4 @@ Then the pipeline adds an additional metadata `is_deprecated` into FT data which
 
 ### 3. Improve data quality of an existing FT data (WIP)
 
-Apply post-processing rules that are currently available for ansible-wisdom-service to an existing FT data
+Apply post-processing rules that are currently available in ansible-wisdom-service to an existing FT data

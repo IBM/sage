@@ -2,7 +2,7 @@
 
 This project is a data pipeline framework and practical examples for generating/processing fine-tuning data for various purposes.
 
-The pipeline framework utilizes Ansible Risk Insight parses Ansible content in YAML files (or prompt string in an existing FT data), and applies configured rules depending on use-cases.
+The pipeline framework utilizes Ansible Risk Insight to parse Ansible content in YAML files (or prompt string in an existing FT data) and to apply configured rules for processing data depending on use-cases.
 
 ## Installation
 

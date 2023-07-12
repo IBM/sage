@@ -1,4 +1,4 @@
-# SAGE DATA PIPELINE
+# sage-data-pipeline
 
 This project is a data pipeline framework and practical examples for generating/processing fine-tuning data for various purposes.
 

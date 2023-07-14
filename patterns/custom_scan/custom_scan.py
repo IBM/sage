@@ -11,7 +11,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     dp = DataPipeline(
-        ari_kb_data_dir="/Users/hiro/ari-kb/ram-generate/ram-all-20230704",
+        ari_kb_data_dir=os.getenv("ARI_KB_DATA_DIR", "<PATH/TO/YOUR/ARI_KB_DATA_DIR>"),
         ari_rules_dir=os.path.join(os.path.dirname(__file__), "rules"),
     )
     os.environ['SAGE_CONTENT_ANALYSIS_OUT_DIR'] = args.out_dir

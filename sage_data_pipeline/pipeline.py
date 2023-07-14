@@ -235,6 +235,7 @@ class DataPipeline(object):
         filenames = os.listdir(search_dir)
         output_list = []
         loaded_task_keys = []
+        used_task_context_files = []
         for filename in filenames:
             if filename.startswith(prefix):
                 fpath = os.path.join(search_dir, filename)
@@ -251,6 +252,15 @@ class DataPipeline(object):
                         output_data = OutputData(data=d)
                         output_list.append(output_data)
                         loaded_task_keys.append(uniq_task_key)
+                used_task_context_files.append(fpath)
+        for fpath in used_task_context_files:
+            if not fpath:
+                continue
+            try:
+                os.remove(fpath)
+            except Exception:
+                err = traceback.format_exc()
+                self.logger.warn(f"failed to remove the temporary file \"{fpath}\": {err}")
         return output_list
 
     # TODO: implement this

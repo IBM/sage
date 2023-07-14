@@ -13,6 +13,7 @@ from ansible_risk_insight.models import (
     Severity,
     Collection,
     Role,
+    Repository,
     Playbook,
     TaskFile,
     Task,
@@ -107,7 +108,7 @@ def make_yaml_before_task(ctx: AnsibleRunContext, task: Task) -> list:
         if not hasattr(file_obj, "yaml_lines"):
             # if the file does not have `yaml_lines`, give up here
             break
-        
+
         if not task.line_num_in_file or len(task.line_num_in_file) != 2:
             # if the task does not have `line_num_in_file`, give up here
             break
@@ -124,8 +125,8 @@ def make_yaml_before_task(ctx: AnsibleRunContext, task: Task) -> list:
         break
 
     # we omit yaml_before_task if it is huge so that we can avoid data size issue
-    if len(yaml_before_task) > max_yaml_str_size:
-        yaml_before_task = ""
+    # if len(yaml_before_task) > max_yaml_str_size:
+    #     yaml_before_task = ""
     return yaml_before_task
 
 
@@ -200,7 +201,7 @@ def get_name_sequence(ctx, task):
     
     return name_seq
 
-def get_parents(ctx, task, current_file):
+def get_parents(ctx, task):
     parents = {
         "role": [],
         "taskfile": [],
@@ -229,11 +230,14 @@ def get_parents(ctx, task, current_file):
             continue
 
         if node.type == RunTargetType.Role:
-            parents["role"].append(node.spec.name)
+            pr = {}
+            pr["name"] = node.spec.name
+            if node.spec.metadata:
+                pr["description"] = node.spec.metadata.get("galaxy_info", {}).get("description", "")
+            parents["role"].append(pr)
         elif node.type == RunTargetType.TaskFile:
-            # if not node.called_from.startswith("RoleCall")
-            if current_file != node.spec.defined_in:
-                parents["taskfile"].append(node.spec.defined_in)
+            # if current_file != node.spec.defined_in:
+            parents["taskfile"].append(node.spec.defined_in)
 
     return parents
 
@@ -255,16 +259,6 @@ def get_used_vars(ctx, task):
     if not previous_task:
         return [], False
     
-    vars_name_value = {}
-    for u_vars in previous_task.variable_use.values():
-        if type(u_vars) == list:
-            for uv in u_vars:
-                if uv.value:
-                    vars_name_value[uv.name] = uv.value
-        else:
-            if u_vars.value:
-                vars_name_value[u_vars.name] = u_vars.value
-
     used_var_names = list(previous_task.variable_use.keys())
     omitted = False
     used_var_names_str = json.dumps(used_var_names)
@@ -272,32 +266,25 @@ def get_used_vars(ctx, task):
         used_var_names = []
         omitted = True
 
-    return used_var_names, omitted, vars_name_value
+    return used_var_names, omitted
 
 
-def get_defined_vars(task, used_vars_name_value):
+def get_defined_vars(task):
     defined_var_names = list(task.variable_set.keys())
     omitted = False
     defined_var_names_str = json.dumps(defined_var_names)
     if len(defined_var_names_str) > vars_json_length_threshold:
         defined_var_names = []
         omitted = True
-    
-    defined_var_name_values = {}
-    for dvn in defined_var_names:
-        if dvn in used_vars_name_value:
-            defined_var_name_values[dvn] = used_vars_name_value[dvn]
-        else:
-            defined_var_name_values[dvn] = ""
 
-    return defined_var_names, omitted, defined_var_name_values
+    return defined_var_names, omitted
 
 
 def get_defined_vars_in_parent(ctx, task):
     ctx_1 = ctx.copy()  # --> reset current
-    defined_vars = []
     defined_vars_name_value = {}
     used_vars_name_value = {}
+    defined_var_names = []
 
     for node in ctx_1:
         # skip non-task node
@@ -306,29 +293,27 @@ def get_defined_vars_in_parent(ctx, task):
         # if node is the target task, exit loop
         if node.spec.key == task.spec.key:
             break
-        
+
         defined_var_names = list(node.variable_set.keys())
-        defined_vars.extend(defined_var_names)
-        defined_vars = list(set(defined_vars))
 
         for d_vars in node.variable_set.values():
             if type(d_vars) == list:
                 for dv in d_vars:
-                    if dv.value is not None:
+                    if dv.value is not None and dv.type != VariableType.RegisteredVars:
                         defined_vars_name_value[dv.name] = dv.value
-            else:
-                if d_vars.value is not None:
+            elif d_vars:
+                if d_vars.value is not None and dv.type != VariableType.RegisteredVars:
                     defined_vars_name_value[d_vars.name] = d_vars.value
 
         for u_vars in node.variable_use.values():
             if type(u_vars) == list:
                 for uv in u_vars:
-                    if uv.value is not None:
+                    if uv.value is not None and uv.type != VariableType.RegisteredVars:
                         used_vars_name_value[uv.name] = uv.value
-            else:
-                if u_vars.value is not None:
+            elif u_vars:
+                if u_vars.value is not None and uv.type != VariableType.RegisteredVars:
                     used_vars_name_value[u_vars.name] = u_vars.value
-    
+
     # get variable values for defined variable names
     found_var_name_values = {}
     for dvn in defined_var_names:
@@ -338,7 +323,6 @@ def get_defined_vars_in_parent(ctx, task):
             found_var_name_values[dvn] = used_vars_name_value[dvn]
         else:
             found_var_name_values[dvn] = ""
-
     return found_var_name_values
 
 def get_used_vars_in_target_task(task):
@@ -463,21 +447,123 @@ def get_metrics(ctx, task, module, used_modules, used_vars, defined_vars, coll_d
     d["num_of_vars_covered_by_context"] = covered_var_count
     return d
 
-def get_type(task_key):
-    # task.spec task taskfile:vhosts.yml#task:[1]
-    # task role:ssh_key_gen#taskfile:roles/ssh_key_gen/tasks/main.yaml#task:[2]
-    # task playbook:playbooks/3_setup_kvm_host.yaml#play:[1]#task:[1]
-    file_type = ""
-    type_info = task_key.split("#")[-2]
-    type_info = type_info.split(" ")[-1]
-    if type_info.startswith("play"):
-        file_type = "playbook"
-    if type_info.startswith("taskfile"):
+def get_file_type(yaml_before_task):
+    if yaml_before_task == "":
         file_type = "taskfile"
-    return file_type
+        context_data = []
+        return file_type, context_data
+    
+    file_type = ""
+    try:
+        context_data = yaml.safe_load(yaml_before_task)
+    except Exception as e:
+        print('the received context could not be loaded as a YAML', e)
+        return file_type, []
+
+    if isinstance(context_data, list):
+        file_type = "taskfile"
+        if context_data[0] and any(
+            play_keyword in context_data[0]
+                for play_keyword in ["tasks", "pre_tasks", "post_tasks", "handlers", "hosts", "roles"]
+            ):
+            file_type = "playbook"
+    return file_type, context_data
 
 
+def make_task_format_context(file_type, context_data, defined_vars, parents):
+    context_yml = ""
+    updated = False
 
+    if not file_type:
+        context_yml = yaml.dump(context_data, sort_keys=False)
+        return context_yml, updated
+
+    if file_type == "taskfile":
+        context_tasks = []
+        if defined_vars:
+            task = {}
+            task["name"] = "define variables"
+            task["ansible.builtin.set_fact"] = make_context_vars_dict(defined_vars)
+            context_tasks.append(task)
+            updated = True
+        
+        import_context_tasks = make_import_context(parents)
+        if len(import_context_tasks) > 0:
+            updated = True
+        context_tasks.extend(import_context_tasks)
+        context_tasks.extend(context_data)
+        context_yml = yaml.dump(context_tasks, sort_keys=False)
+
+    elif file_type == "playbook":
+        context_tasks = make_import_context(parents)
+
+        play = context_data[-1]
+        if defined_vars:
+            if "vars" not in play:
+                play["vars"] = make_context_vars_dict(defined_vars)
+                updated = True
+            elif "vars" in play:
+                original_vars = play["vars"]
+                original_vars.update(make_context_vars_dict(defined_vars))
+                play["vars"] = original_vars
+                updated = True
+        if len(context_tasks) > 0:
+            for play_keyword in ["tasks", "pre_tasks", "post_tasks", "handlers"]:
+                if play_keyword in play:
+                    tasks = play[play_keyword]
+                    if len(context_tasks) > 0:
+                        updated = True
+                    if type(tasks) == list:
+                        context_tasks.extend(tasks)
+                    play[play_keyword] = context_tasks
+                    break
+        context_data[-1] = play
+        context_yml = yaml.dump(context_data, sort_keys=False)
+    # print("dense context\n", context_yml)
+    return context_yml, updated
+
+def make_context_vars_dict(defined_vars):
+    vars_dict = {}
+    for dv, value in defined_vars.items():
+        if value is not None and value != "":
+            vars_dict[dv] = value
+        else:
+            dv = dv.replace('"','')
+            dv = dv.replace("'","")
+            vars_dict[dv] = f"{{{{ {dv} }}}}"
+    return vars_dict
+
+def make_import_context(parents):
+    context_tasks = []
+    if parents["role"]:
+        for pr in parents["role"]:
+            task = {}
+            if pr.get("description", ""):
+                task["name"] = pr["description"]
+            else:
+                task["name"] = "import role"
+            task["ansible.builtin.import_role"] = {
+                "name": pr["name"],
+            }
+            context_tasks.append(task)
+    if parents["taskfile"]:
+        for t_name in parents["taskfile"]:
+            task = {}
+            task["name"] = "import tasks"
+            task["ansible.builtin.import_tasks"] = {
+                "file": t_name,
+            }
+            context_tasks.append(task)
+    return context_tasks
+
+def get_file_path(task, scan_type, scan_path):
+    path = ""
+    defined_in = getattr(task.spec, "defined_in", "")
+    if scan_type == "taskfile":
+        path = scan_path
+    else:
+        path = os.path.join(scan_path, defined_in)
+    return path
 
 @dataclass
 class PreProcessingRule(Rule):
@@ -575,66 +661,25 @@ class PreProcessingRule(Rule):
         self.data_buffer_scan_result = []
         return
     
-    def make_task_format_context(self, defined_vars, parents):
-        context_tasks = []
-        context_play = {}
-
-        if defined_vars:
-            task = {}
-            task["name"] = "define variables"
-            task["ansible.builtin.set_fact"] = {}
-            for dv, value in defined_vars.items():
-                if value is not None:
-                    task["ansible.builtin.set_fact"][dv] = value
-                else:
-                    dv = dv.replace('"','')
-                    dv = dv.replace("'","")
-                    task["ansible.builtin.set_fact"][dv] = f"{{{{ {dv} }}}}"
-            context_tasks.append(task)
-
-        if parents["role"]:
-            for r_name in parents["role"]:
-                task = {}
-                task["name"] = "import role"
-                task["ansible.builtin.import_role"] = {
-                    "name": r_name,
-                }
-                context_tasks.append(task)
-        if parents["taskfile"]:
-            for t_name in parents["taskfile"]:
-                task = {}
-                task["name"] = "import tasks"
-                task["ansible.builtin.import_tasks"] = {
-                    "file": t_name,
-                }
-                context_tasks.append(task)
-
-        context_yml = ""
-        if context_play:
-            context_play["tasks"] = context_tasks
-            context_yml = yaml.dump(context_play, sort_keys=False)
-        elif len(context_tasks) != 0:
-            context_yml = yaml.dump(context_tasks, sort_keys=False)
-        # print("dense context\n", context_yml)
-        return context_yml
-
     def match(self, ctx: AnsibleRunContext) -> bool:
         return ctx.current.type == RunTargetType.Task
 
     def process(self, ctx: AnsibleRunContext):
         task = ctx.current
-        file_type = get_type(task.spec.key)
-        
+
         verdict = False
         detail = {}
 
         parent_of_task = task.spec.collection or task.spec.role
+
         if "." in parent_of_task:
             context_parent = ""
             if isinstance(ctx.parent, Collection):
                 context_parent = ctx.parent.name
             elif isinstance(ctx.parent, Role):
                 context_parent = ctx.parent.fqcn
+            elif isinstance(ctx.parent, Repository): 
+                context_parent = ctx.parent.name
             if context_parent != parent_of_task:
                 return RuleResult(verdict=verdict, detail=detail, file=task.file_info(), rule=self.get_metadata())
 
@@ -645,30 +690,15 @@ class PreProcessingRule(Rule):
         current_depth = task.depth  # e.g) 3
 
         module = get_module_name(task)
+        used_vars, _ = get_used_vars(ctx, task)
+        defined_vars, _ = get_defined_vars(task)
 
-        used_modules = get_used_modules(ctx, task)
-        name_sequence = get_name_sequence(ctx, task)
-        used_vars, used_vars_omitted, used_var_name_values = get_used_vars(ctx, task)
-        defined_vars, defined_vars_omitted, _ = get_defined_vars(task, used_var_name_values)
-        coll_deps, role_deps = get_dependency(ctx)
-        metrics = get_metrics(ctx, task, module, used_modules, used_vars, defined_vars, coll_deps, role_deps)
-
-        wisdom_context = {}
-
-        wisdom_context["used_modules"] = used_modules
-        wisdom_context["name_sequence"] = name_sequence
-        wisdom_context["used_vars"] = used_vars
-        wisdom_context["used_vars_omitted"] = used_vars_omitted
-        wisdom_context["defined_vars"] = defined_vars
-        wisdom_context["defined_vars_omitted"] = defined_vars_omitted
-        wisdom_context["dependency_collections"] = coll_deps
-        wisdom_context["dependency_roles"] = role_deps
-
-        parents = get_parents(ctx, task, getattr(task.spec, "defined_in", ""))
+        parents = get_parents(ctx, task)
         defined_var_name_values = get_defined_vars_in_parent(ctx, task)
-        ari_new_context = self.make_task_format_context(defined_var_name_values, parents)
 
         yaml_before_task = make_yaml_before_task(ctx, task.spec)
+        file_type, context_data = get_file_type(yaml_before_task)
+        ari_new_context, context_updated = make_task_format_context(file_type, context_data, defined_var_name_values, parents)
 
         train = {
             "license": "",
@@ -691,14 +721,16 @@ class PreProcessingRule(Rule):
         }
 
         # repo_type, repo_name, license, source, path = find_repo_info(ctx)
+        scan_data = ctx.scan_metadata
+        scan_type = scan_data.get("type")
+        scan_path = scan_data.get("name")
+        path = get_file_path(task, scan_type, scan_path)
 
         # input_script = json.dumps(wisdom_context, default=serialize)
-        ari_old_context = yaml.dump(wisdom_context, sort_keys=False, Dumper=Dumper)
         train["input_script"] = yaml_before_task
-        train["ari_old_context"] = ari_old_context
         train["ari_new_context"] = ari_new_context
-        train["metrics"] = metrics
-        train["context_len"] = len(yaml_before_task)
+        train["is_context_updated"] = context_updated
+        train["context_len"] = len(ari_new_context)
         # train["yaml_before_task"] = yaml_before_task
         train["license"] = ""
         train["license_check"] = ""
@@ -707,13 +739,13 @@ class PreProcessingRule(Rule):
         train["repo_name"] = ""
         train["type"] = file_type
         train["scan_type"] = getattr(task.spec, "type", "")
-        train["output_script"] = getattr(task.spec, "yaml_lines", "")
+        task_str = getattr(task.spec, "yaml_lines", "")
+        if "<<:" in task_str:
+            task_str = task.spec.yaml(use_yaml_lines=False)
+        train["output_script"] = task_str
         train["module_name"] = module
         train["id"] = f"{current_id}-{current_depth}"  # <ari_node_id> - <ari_node_depth>
         train["ari_task_key"] = task.spec.key
-        scan_data = ctx.scan_metadata
-        scan_type = scan_data.get("type")
-        scan_path = scan_data.get("name")
         train["scan_type"] = scan_type
         train["scan_path"] = scan_path
         
@@ -731,6 +763,7 @@ class PreProcessingRule(Rule):
         detail = train
 
         task_spec = vars(task.spec)
+        task_spec["scan_path"] = scan_path
         annotations = {}
         annotations["correct_fqcn"] = task.get_annotation(key="module.correct_fqcn")
         annotations["need_correction"] = task.get_annotation(key="module.need_correction")
@@ -758,12 +791,10 @@ class PreProcessingRule(Rule):
 
         task_spec["annotations"] = annotations
 
-
         is_last_node_for_this_parent = False
         if ctx.last_item and ctx.is_last_task(task):
             is_last_node_for_this_parent = True
         
-
         self.data_buffer_ftdata.append(json.dumps(detail, default=serialize))
         self.data_buffer_scan_result.append(jsonpickle.encode(task_spec, make_refs=False, unpicklable=False))
         if len(self.data_buffer_ftdata) >= self.buffer_size or is_last_node_for_this_parent:

@@ -13,7 +13,7 @@ classifiers = [
     "Programming Language :: Python :: 3",
 ]
 dependencies = [
-    "ansible-risk-insight",
+    "ansible-risk-insight@git+https://github.com/hirokuni-kitahara/ansible-risk-insight@dev/yml-labeling",
 ]
 
 dynamic = ["version"]

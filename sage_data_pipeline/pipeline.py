@@ -242,13 +242,15 @@ class DataPipeline(object):
                     for line in file:
                         d = json.loads(line)
                         task_key = d.get("ari_task_key", None)
-                        if not task_key:
+                        scan_path = d.get("scan_path", None)
+                        uniq_task_key = f"{scan_path}-{task_key}"
+                        if uniq_task_key in loaded_task_keys:
                             continue
                         if task_key in loaded_task_keys:
                             continue
                         output_data = OutputData(data=d)
                         output_list.append(output_data)
-                        loaded_task_keys.append(task_key)
+                        loaded_task_keys.append(uniq_task_key)
         return output_list
 
     # TODO: implement this

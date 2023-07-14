@@ -23,6 +23,7 @@ from ansible_risk_insight.finder import (
     get_project_info_for_file,
 )
 from ansible_risk_insight.utils import escape_local_path
+from ansible_risk_insight.risk_detector import load_rules
 import os
 import argparse
 import time
@@ -137,3 +138,9 @@ def get_yml_list(root_dir: str):
             "in_project": in_project,
         })
     return all_files
+
+
+def get_rule_id_list(rules_dir=""):
+    rules = load_rules(rules_dir=rules_dir)
+    rule_id_list = [rule.rule_id for rule in rules]
+    return rule_id_list

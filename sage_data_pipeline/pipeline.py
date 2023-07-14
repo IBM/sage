@@ -10,17 +10,15 @@ from ansible_risk_insight.finder import (
 from ansible_risk_insight.utils import escape_local_path
 from sage_data_pipeline.utils import get_rule_id_list
 import os
-import argparse
 import time
 import traceback
 import logging
-import joblib
 import threading
-import jsonpickle
 import json
 
 
-logger = logging.getLogger(__name__)
+logging.basicConfig()
+logger = logging.getLogger("pipeline")
 log_level_str = os.getenv("SAGE_LOG_LEVEL", "info")
 log_level_map = {
     "error": logging.ERROR,
@@ -31,7 +29,7 @@ log_level_map = {
 log_level = log_level_map.get(log_level_str, None)
 if log_level is None:
     logger.warn(f"logging level \"{log_level_str}\" is not supported. Set to \"info\" instead.")
-    log_level = logging.WARNING
+    log_level = logging.INFO
 logger.setLevel(log_level)
 
 ari_kb_dir = os.getenv("ARI_KB_DIR", None)
@@ -78,7 +76,7 @@ class DataPipeline(object):
     ari_rules: list = field(default_factory=list)
 
     scanner: ARIScanner = None
-    log_level: str = ""
+    log_level_str: str = ""
     logger: logging.Logger = None
 
     # whether it scans the failed files later: default to True
@@ -108,9 +106,8 @@ class DataPipeline(object):
 
     def init_logger(self):
         global logger
-        _level_str = self.log_level or log_level
+        _level_str = self.log_level_str or log_level_str
         _level = log_level_map.get(_level_str, logging.INFO)
-        self.log_level = _level
         logger.setLevel(_level)
         self.logger = logger
 
@@ -132,7 +129,7 @@ class DataPipeline(object):
                 data_dir=_data_dir,
                 rules_dir=_rules_dir,
                 rules=_rules,
-                log_level=self.log_level,
+                log_level=self.log_level_str,
             ),
             silent=True,
         )
@@ -191,6 +188,9 @@ class DataPipeline(object):
                 type="project",
                 name=project_name,
                 path=project_path,
+                metadata={
+                    "base_dir": project_path,
+                }
             ))
             i += 1
 
@@ -204,6 +204,9 @@ class DataPipeline(object):
                 type="role",
                 name=role_name,
                 path=role_path,
+                metadata={
+                    "base_dir": role_path,
+                }
             ))
             i += 1
 
@@ -218,6 +221,9 @@ class DataPipeline(object):
                 type=_type,
                 name=_name,
                 path=filepath,
+                metadata={
+                    "base_dir": target_dir,
+                }
             ))
             i += 1
 
@@ -269,6 +275,7 @@ class DataPipeline(object):
 
     
     def run(self, **kwargs):
+        self.logger.info("Running data pipeline")
         
         self._init_scan_records()
         
@@ -303,6 +310,8 @@ class DataPipeline(object):
         if output_dir:
             output_path = os.path.join(output_dir, "ftdata.json")
             self.save(output_list, output_path)
+
+        self.logger.info("Done")
 
     # TODO: implement this
     def _single_scan(self):
@@ -386,11 +395,16 @@ class DataPipeline(object):
         name = input_data.name
         path = input_data.path
         original_type = input_data.metadata.get("original_type", _type)
-        elapsed = round(time.time() - start, 2)
+        base_dir = input_data.metadata.get("base_dir", None)
+        display_name = name
+        if base_dir and name.startswith(base_dir):
+            display_name = name.replace(base_dir, "", 1)
+            if display_name and display_name[-1] == "/":
+                display_name = display_name[:-1]
 
         start_of_this_scan = time.time()
         thread_id = threading.get_native_id()
-        self.logger.info(f"[{i+1}/{num}] start {_type} {name} {path} ({elapsed} sec. elapsed) (thread: {thread_id})")
+        self.logger.debug(f"[{i+1}/{num}] start {_type} {display_name}")
         use_src_cache = True
 
         taskfile_only = False

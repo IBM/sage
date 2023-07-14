@@ -591,47 +591,11 @@ class PreProcessingRule(Rule):
     
     def __post_init__(self):
 
-        self.license_whitelist = self.load_license_list("license_whitelist.txt")
-        self.license_blacklist = self.load_license_list("license_blacklist.txt")
-        self.license_nillist = self.load_license_list("license_nillist.txt")
-
         if os.path.exists(self.task_context_data_save_filepath):
             os.remove(self.task_context_data_save_filepath)
 
         if os.path.exists(self.scan_result_save_filepath):
             os.remove(self.scan_result_save_filepath)
-
-    def load_license_list(self, filename):
-        here = os.path.dirname(__file__)
-        filepath = os.path.join(here, filename)
-        license_list = []
-        with open(filepath, "r") as file:
-            license_list = [self.norm_license(line.strip()) for line in file.readlines()]
-        return license_list
-
-    # Normalize a license label as a string value, removing specific characters and lowercasing
-    # Ref: https://github.ibm.com/ai4code-wisdom/datasets/blob/ \
-    #        main/legal_compliance/utils/license_filter.py#L80
-    def norm_license(self, license) -> str:
-        license = str(license).lower()
-        for char in self._char_remove_list:
-            license=license.replace(char, "")
-        return license
-
-    # return "approved", "not-approved" or "unknown"
-    def license_check(self, license: str):
-        normed = self.norm_license(license)
-        if normed in self.license_whitelist:
-            return "approved"
-        elif normed in self.license_nillist:
-            # nil should be approved
-            # Ref: https://github.ibm.com/ai4code-wisdom/datasets/blob/ \
-            #        main/legal_compliance/utils/license_filter_test.py#L12-L14
-            return "approved"
-        elif normed in self.license_blacklist:
-            return "not-approved"
-        
-        return "unknown"
     
     def save_data(self):
         # ftdata

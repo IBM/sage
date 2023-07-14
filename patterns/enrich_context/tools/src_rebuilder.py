@@ -13,37 +13,17 @@ def prepare_source_dir(root_dir, type, yaml_file):
 
     yaml_file_contents = load_json_data(yaml_file)
     for content in yaml_file_contents:
-        if type == "collection":
-            namespace_name = content.get("namespace_name")
-            path = content.get("path")
-            text = content.get("text")
-            source = content.get("source")
-            license = content.get("license")
-            path_list.append({
-                "repo_type": type,
-                "repo_name": namespace_name,
-                "source": source,
-                "license": license,
-                "path": path,
-            })
-            ns = namespace_name.split(".")[0]
-            name = namespace_name.split(".")[1]
-            target_dir = os.path.join(root_dir, "ansible_collections", ns, name)
-            if not os.path.exists(target_dir):
-                os.makedirs(target_dir)
-            target_file = os.path.join(target_dir, path)
-            target_file_dir = extract_directory(target_file)
-            if not os.path.exists(target_file_dir):
-                os.makedirs(target_file_dir)
-            with open(target_file, "w") as file:
-                # print(f"exporting yaml file {target_file}")
-                file.write(text)
+        if "namespace_name" in content:
+            type = "collection_role"
+        else:
+            type = "project"
+
         if type == "project":
             repo_name = content.get("repo_name")
             path = content.get("path")
             text = content.get("content")
             license = content.get("license")
-            target_dir = os.path.join(root_dir, "project", repo_name)
+            target_dir = os.path.join(root_dir, repo_name)
             if not os.path.exists(target_dir):
                 os.makedirs(target_dir)
             target_file = os.path.join(target_dir, path.lstrip("/"))
@@ -63,7 +43,7 @@ def prepare_source_dir(root_dir, type, yaml_file):
                 })
             except Exception as e:
                 print(e)
-        if type == "role":
+        if type == "collection_role":
             namespace_name = content.get("namespace_name")
             path = content.get("path")
             text = content.get("text")
@@ -76,7 +56,7 @@ def prepare_source_dir(root_dir, type, yaml_file):
                 "license": license,
                 "path": path,
             })
-            target_dir = os.path.join(root_dir, "role", namespace_name)
+            target_dir = os.path.join(root_dir, namespace_name)
             if not os.path.exists(target_dir):
                 os.makedirs(target_dir)
             target_file = os.path.join(target_dir, path)

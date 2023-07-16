@@ -36,13 +36,18 @@ if __name__ == "__main__":
         if "repo_name" in r:
             repo_names.add(r.get("repo_name"))
 
-    dp = DataPipeline(
-        ari_kb_data_dir=os.getenv("ARI_KB_DATA_DIR", "<PATH/TO/YOUR/ARI_KB_DATA_DIR>"),
-        ari_rules_dir=os.path.join(os.path.dirname(__file__), "rules"),
-    )
+    total = len(repo_names)
+    count = 0
+
+    out_scope = [
+        "IBM/playbook-integrity-operator",
+        "RedHatOfficial/ansible-role-rhv4-rhvh-stig",
+    ]
 
     for repo_name in repo_names:
-        if repo_name != "IBM/Ansible-OpenShift-Provisioning":
+        if repo_name in out_scope:
+            print(f"skip {repo_name} ({count}/{total})")
+            count += 1
             continue
 
         tdir = os.path.join(src_rb_dir, src_type, repo_name)
@@ -51,7 +56,15 @@ if __name__ == "__main__":
         # why needed?
         os.environ["SAGE_CONTENT_ANALYSIS_OUT_DIR"] = odir
 
+        print(f"scanning {repo_name} ({count}/{total})")
+
+        dp = DataPipeline(
+            ari_kb_data_dir=os.getenv("ARI_KB_DATA_DIR", "<PATH/TO/YOUR/ARI_KB_DATA_DIR>"),
+            ari_rules_dir=os.path.join(os.path.dirname(__file__), "rules"),
+        )
+
         dp.run(
             target_dir=tdir,
             output_dir=odir,
         )
+        count += 1

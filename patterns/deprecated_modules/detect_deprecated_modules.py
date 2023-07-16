@@ -80,7 +80,7 @@ class Pipeline(object):
         resume_str = f"(resume from {resume})" if resume > 0 else ""
         total_str = f"{len(ftdata)} entries"
 
-        print(f"Start scanning for {total_str} {resume_str}")
+        # print(f"Start scanning for {total_str} {resume_str}")
 
         _types = {
             "task": "taskfile",
@@ -112,7 +112,7 @@ class Pipeline(object):
         elapsed = round(time.time() - self.start, 2)
         start_of_this_scan = time.time()
         thread_id = threading.get_native_id()
-        print(f"[{i+1}/{num}] start {display_name} ({elapsed} sec. elapsed) (thread: {thread_id})")
+        # print(f"[{i+1}/{num}] start {display_name} ({elapsed} sec. elapsed) (thread: {thread_id})")
 
         result = None
         scandata = None

@@ -576,10 +576,6 @@ class PreProcessingRule(Rule):
     tags: tuple = ("wisdom")
     precedence: int = 1
 
-    license_whitelist: list = field(default_factory=list)
-    license_blacklist: list = field(default_factory=list)
-    license_nillist: list = field(default_factory=list)
-
     _char_remove_list: tuple = ("[","]","'",'"','(',')')
 
     task_context_data_save_filepath: str = default_task_context_data_filepath

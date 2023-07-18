@@ -1,4 +1,4 @@
-# sage
+# Sage Project
 
 Sage is a framework for Ansible repository scan to create graph/intermediate/high level representation of data that can be downstream converted to ftdata. The project includes practical examples for generating/processing task data such as 
 - Creating training data specific to a customer repository ([link](./doc/custom-repo-scan.md))

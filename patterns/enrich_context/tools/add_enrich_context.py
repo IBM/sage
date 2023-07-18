@@ -19,7 +19,7 @@ class Mapping(object):
         wisdom_ftdata = load_json_data(wisdom_file, src_type, repo_name)
         print(f"comparing tasks: ari {len(ari_ftdata)} wisdom {(len(wisdom_ftdata))}")
 
-        spec_match, similarity_match_list, only_wisdom = self.separate_wisdom_data(wisdom_ftdata, ari_ftdata)
+        spec_match, similarity_match_list, only_org_ftdata = self.separate_wisdom_data(wisdom_ftdata, ari_ftdata)
         matched_list = []
         matched_list.extend(spec_match)
         matched_list.extend(similarity_match_list)
@@ -27,7 +27,7 @@ class Mapping(object):
         modified_wisdom_ftdata = self.add_dense_context(matched_list)
         os.makedirs(self.output_dir, exist_ok=True)
         export_result(os.path.join(self.output_dir, "modified_ftdata.json"), modified_wisdom_ftdata)
-        export_result(os.path.join(self.output_dir, "only_wisdom.json"), only_wisdom)
+        export_result(os.path.join(self.output_dir, "only_org_ftdata.json"), only_org_ftdata)
         return
 
     def export_tmp_file(self, type, sorted_data):
@@ -41,7 +41,7 @@ class Mapping(object):
     def separate_wisdom_data(self, wisdom_list, ari_list):
         spec_match_list = []
         similarity_match_list = []
-        only_wisdom = []
+        only_org_ftdata = []
 
         for i, w_item in enumerate(wisdom_list):
             w_module_name = w_item.get("module_name")
@@ -80,9 +80,9 @@ class Mapping(object):
 
         for w_item in wisdom_list:
             if not self.is_in_list(spec_match_list, w_item) and not self.is_in_list(similarity_match_list, w_item):
-                only_wisdom.append(w_item)
+                only_org_ftdata.append(w_item)
 
-        return spec_match_list, similarity_match_list, only_wisdom
+        return spec_match_list, similarity_match_list, only_org_ftdata
 
     def add_dense_context(self, matched_list):
         modified_list = []

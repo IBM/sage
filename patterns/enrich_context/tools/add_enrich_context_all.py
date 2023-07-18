@@ -146,4 +146,4 @@ if __name__ == "__main__":
         output_dir = os.path.join(out_dir, target_src_type, repo_name)
         print(f"m.run():wisdom_input={wisdom_input},tmp_sage_ftdata={tmp_sage_ftdata},output_dir={output_dir}")
         m = Mapping(output_dir)
-        m.run(tmp_sage_ftdata, wisdom_input)
+        m.run(tmp_sage_ftdata, wisdom_input, target_src_type, repo_name)

@@ -14,9 +14,9 @@ class Mapping(object):
     def __init__(self, output_dir) -> None:
         self.output_dir = output_dir
 
-    def run(self, ari_file, wisdom_file):
+    def run(self, ari_file, wisdom_file, src_type, repo_name):
         ari_ftdata = load_json_data(ari_file)
-        wisdom_ftdata = load_json_data(wisdom_file)
+        wisdom_ftdata = load_json_data(wisdom_file, src_type, repo_name)
         print(f"comparing tasks: ari {len(ari_ftdata)} wisdom {(len(wisdom_ftdata))}")
 
         spec_match, similarity_match_list, only_wisdom = self.separate_wisdom_data(wisdom_ftdata, ari_ftdata)
@@ -106,12 +106,16 @@ class Mapping(object):
                 matched.append(item)
         return matched
 
-def load_json_data(filepath):
+def load_json_data(filepath, src_type=None, repo_name=None):
     with open(filepath, "r") as file:
         records = file.readlines()
     trains = []
     for record in records:
         train = json.loads(record)
+        if src_type is not None and train.get("source") != src_type:
+            continue
+        if repo_name is not None and train.get("repo_name") != repo_name:
+            continue
         trains.append(train)
     return trains
 
@@ -172,8 +176,10 @@ def add_repo_info_from_inventory(inventory_file, ftdata_file, output_file):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="TODO")
     parser.add_argument("-s", "--sage-dir", help="")
-    parser.add_argument("-w", "--wisdom", help="")
-    parser.add_argument("-o", "--output-dir", help="")
+    parser.add_argument("-f", "--ftdata", help="")
+    parser.add_argument("-o", "--out-dir", help="")
+    parser.add_argument("-t", "--src-type", help="")
+    parser.add_argument("-r", "--repo-name", help="")
     args = parser.parse_args()
 
     sage_dir = args.sage_dir
@@ -184,8 +190,10 @@ if __name__ == '__main__':
     sage_ftdata = os.path.join(sage_dir, "ftdata.json")
     tmp_sage_ftdata = os.path.join(sage_dir, "ftdata-modified.json") # with correct path
 
-    wisdom_input = args.wisdom
-    output_dir = args.output_dir
+    wisdom_input = args.ftdata
+    output_dir = args.out_dir
+    src_type = args.src_type
+    repo_name = args.repo_name
 
     add_repo_info_from_inventory(inventory_file, sage_ftdata, tmp_sage_ftdata)
 
@@ -193,4 +201,4 @@ if __name__ == '__main__':
         os.makedirs(output_dir)
 
     m = Mapping(output_dir)
-    m.run(tmp_sage_ftdata, wisdom_input)
+    m.run(tmp_sage_ftdata, wisdom_input, src_type, repo_name)

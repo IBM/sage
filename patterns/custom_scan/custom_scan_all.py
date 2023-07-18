@@ -6,8 +6,8 @@ from sage_data_pipeline.tools.src_rebuilder import write_result, prepare_source_
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="TODO")
-    parser.add_argument("-t", "--source_type", help='source type (e.g."GitHub-RHIBM")')
-    parser.add_argument("-i", "--source_json", help='source json file path (e.g. "/tmp/RH_IBM_FT_data_GH_api.json")')
+    parser.add_argument("-t", "--source-type", help='source type (e.g."GitHub-RHIBM")')
+    parser.add_argument("-s", "--source-json", help='source json file path (e.g. "/tmp/RH_IBM_FT_data_GH_api.json")')
     parser.add_argument("-o", "--out-dir", help="output directory")
     args = parser.parse_args()
 
@@ -17,14 +17,14 @@ if __name__ == "__main__":
     src_rb_dir = os.path.join(work_dir, "src_rb")
     path_list_dir = os.path.join(work_dir, "path_list")
     result_dir = os.path.join(work_dir, "results")
-    adir = os.path.join(src_rb_dir, src_type)
-    outfile = os.path.join(path_list_dir, f"path-list-{src_type}.txt")
 
     os.makedirs(work_dir, exist_ok=True)
     os.makedirs(src_rb_dir, exist_ok=True)
     os.makedirs(path_list_dir, exist_ok=True)
     os.makedirs(result_dir, exist_ok=True)
 
+    adir = os.path.join(src_rb_dir, src_type)
+    outfile = os.path.join(path_list_dir, f"path-list-{src_type}.txt")
     path_list = prepare_source_dir(adir, "project", src_json)
     write_result(outfile, path_list)
 

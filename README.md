@@ -29,113 +29,81 @@ The data is useful to compute rich context information beyond single. For exampl
   - task A is called in taskfile `debian.yml` in role R `ansible-rabbitmq` for `Ansible role to install/configure RabbitMQ`
   - a set of variables `x1...xn` are avaialble in task B
 
-The data can be accessed by rules at runtime, and the data is exported as knowledge base file (ARI RAM file) for later use. 
+The data can be accessed by rules at runtime, and the [data file](./doc/sample-findings.json) is exported as knowledge base file (ARI RAM file) for later use. 
 
 ```
-{
-  "py/object": "ansible_risk_insight.models.Role",
-  "type": "role",
-  "key": "role collection:debops.debops#role:debops.debops.ansible",
-  "name": "ansible",
-  "defined_in": "roles/ansible",
-  "local_key": "role role:roles/ansible",
-  "fqcn": "debops.debops.ansible",
-  "metadata": {
-    "collections": [
-      "debops.debops"
-    ],
-    "dependencies": [],
-    "galaxy_info": {
-      "company": "DebOps",
-      "author": "Maciej Delmanowski",
-      "description": "Install Ansible on Debian/Ubuntu host using Ansible",
-      "license": "GPL-3.0-only",
-      "min_ansible_version": "2.4.0",
-      "platforms": [
-        {
-          "name": "Debian",
-          "versions": [
-            "wheezy",
-            "jessie",
-            "stretch",
-            "buster"
-          ]
-        },
-        {
-          "name": "Ubuntu",
-          "versions": [
-            "precise",
-            "trusty",
-            "xenial",
-            "bionic"
-          ]
-        }
-      ],
-      "galaxy_tags": [
-        "ansible"
-      ]
-    }
-  },
-  "collection": "debops.debops",
-  "playbooks": [],
-  "taskfiles": [
-    "taskfile collection:debops.debops#taskfile:roles/ansible/tasks/main.yml"
-  ],
-  "handlers": [],
-  "modules": [],
-  "dependency": {
-    "roles": [],
-    "collections": [
-      "debops.debops"
-    ]
-  },
-  "requirements": {},
-  "source": "",
-  "annotations": {},
-  "default_variables": {
-    "ansible__deploy_type": "{{ \"upstream\" if (ansible_distribution_release in [ \"wheezy\", \"jessie\", \"precise\", \"trusty\", \"xenial\" ]) else \"system\" }}",
-    "ansible__upstream_apt_key": "6125 E2A8 C77F 2818 FB7B D15B 93C4 A3FD 7BB9 C367",
-    "ansible__upstream_apt_repository": "deb http://ppa.launchpad.net/ansible/ansible/ubuntu xenial main",
-    "ansible__base_packages": [
-      "{{ \"ansible\" if (ansible__deploy_type in [ \"system\", \"upstream\" ]) else [] }}"
-    ],
-    "ansible__packages": [],
-    "ansible__bootstrap_version": "devel",
-    "ansible__apt_preferences__dependent_list": [
-      {
-        "package": "ansible",
-        "backports": [
-          "wheezy",
-          "jessie",
-          "stretch",
-          "buster"
-        ],
-        "reason": "Compatibility with upstream release",
-        "by_role": "debops_ansible",
-        "state": "{{ \"absent\" if (ansible__deploy_type == \"upstream\") else \"present\" }}"
-      },
-      {
-        "package": "ansible",
-        "pin": "release o=LP-PPA-ansible-ansible",
-        "priority": "600",
-        "by_role": "debops_ansible",
-        "filename": "debops_ansible_upstream.pref",
-        "reason": "Recent version from upstream PPA",
-        "state": "{{ \"present\" if (ansible__deploy_type == \"upstream\") else \"absent\" }}"
-      }
-    ],
-    "ansible__keyring__dependent_apt_keys": [
-      {
-        "id": "{{ ansible__upstream_apt_key }}",
-        "repo": "{{ ansible__upstream_apt_repository }}",
-        "state": "{{ \"present\" if (ansible__deploy_type == \"upstream\") else \"absent\" }}"
-      }
-    ]
-  },
-  "variables": {},
-  "loop": {},
-  "options": {}
-}
+$ python sage/tools/view_findings.py -f /tmp/test-rabbitmq/sage_dir/findings.json -t role
+Role ansible-rabbitmq
+├── TaskFile tasks/config.yml
+│   ├── Task config | Configuring RabbitMQ
+│   └── Task config | Configuring RabbitMQ environemnt
+├── TaskFile tasks/debian.yml
+│   ├── Task debian | Adding Pre-Reqs
+│   ├── Task debian | adding RabbitMQ public GPG key to the apt repo
+│   ├── Task debian | adding RabbitMQ repo
+│   ├── Task debian | add Rabbitmq erlang repo key
+│   ├── Task debian | add Rabbitmq erlang repo
+│   ├── Task debian | installing RabbitMQ server
+│   ├── Task debian | ensuring that the RabbitMQ service is running
+│   └── Task debian | enabling the RabbitMQ Management Console
+├── TaskFile tasks/fedora.yml
+│   ├── Task fedora | installing pre-reqs
+│   ├── Task fedora | installing erlang
+│   ├── Task fedora | adding RabbitMQ public GPG key
+│   ├── Task fedora | downloading RabbitMQ
+│   ├── Task fedora | installing RabbitMQ
+│   ├── Task fedora | starting and enabling RabbitMQ service
+│   └── Task fedora | enabling the RabbitMQ Management Console
+├── TaskFile tasks/main.yml
+│   ├── Task (No name)
+│   ├── Task (No name)
+│   ├── Task (No name)
+│   ├── Task (No name)
+│   ├── Task checking to see if already clustered
+│   ├── Task (No name)
+│   ├── Task (No name)
+│   ├── Task (No name)
+│   └── Task (No name)
+├── TaskFile tasks/rabbitmq_clustering.yml
+│   ├── Task rabbitmq_clustering | stopping rabbitmq app
+│   ├── Task rabbitmq_clustering | resetting rabbitmq app
+│   ├── Task rabbitmq_clustering | stopping rabbitmq-server
+│   ├── Task rabbitmq_clustering | Capturing Erlang Cookie On Master
+│   ├── Task rabbitmq_clustering | Setting Erlang Cookie Of Master on Non-Master
+│   ├── Task rabbitmq_clustering | copy erlang cookie
+│   ├── Task rabbitmq_clustering | restarting rabbitmq-server on master
+│   ├── Task rabbitmq_clustering | starting rabbitmq app on master
+│   ├── Task rabbitmq_clustering | sending sigterm to any running rabbitmq processes
+│   ├── Task rabbitmq_clustering | restarting rabbitmq-server
+│   ├── Task rabbitmq_clustering | stopping rabbitmq app
+│   ├── Task rabbitmq_clustering | resetting rabbitmq app
+│   ├── Task rabbitmq_clustering | joining rabbitmq cluster
+│   ├── Task rabbitmq_clustering | starting rabbitmq app
+│   └── Task rabbitmq_clustering | marking as clustered
+├── TaskFile tasks/rabbitmq_ha_config.yml
+│   ├── Task rabbitmq_ha_config | checking if rabbitmqadmin is installed
+│   ├── Task rabbit_ha_config | Installing rabbitMQ admin
+│   ├── Task rabbitmq_ha_config | creating exchange(s)
+│   ├── Task rabbitmq_ha_config | creating queue(s)
+│   ├── Task rabbitmq_ha_config | setting up ha on queue(s)
+│   └── Task rabbitmq_ha_config | creating binding(s)
+├── TaskFile tasks/rabbitmq_users.yml
+│   ├── Task rabbitmq_users | creating rabbitmq users
+│   └── Task rabbitmq_users | creating rabbitmq users
+├── TaskFile tasks/rabbitmq_vhosts.yml
+│   ├── Task rabbitmq_extra_vhosts | Create vhosts
+│   ├── Task rabbitmq_extra_vhosts | Check guest administrator is present
+│   └── Task rabbitmq_extra_vhosts | Give access to new vhosts to guest administrator
+└── TaskFile tasks/redhat.yml
+    ├── Task redhat | installing pre-reqs
+    ├── Task redhat | installing erlang
+    ├── Task redhat | adding RabbitMQ public GPG key
+    ├── Task redhat | downloading RabbitMQ
+    ├── Task redhat | installing RabbitMQ
+    ├── Task redhat | starting and enabling RabbitMQ service
+    └── Task redhat | enabling the RabbitMQ Management Console
+
+------------------------------------------------------------------------------------------
 ```
 
 ## Installation

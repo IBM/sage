@@ -15,6 +15,7 @@ classifiers = [
 dependencies = [
     "ansible-risk-insight@git+https://github.com/hirokuni-kitahara/ansible-risk-insight@dev/yml-labeling",
     "Levenshtein",
+    "treelib",
 ]
 
 dynamic = ["version"]

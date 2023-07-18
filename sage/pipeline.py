@@ -87,6 +87,7 @@ class SagePipeline(object):
 
     do_save_yml_inventory: bool = True
     do_save_unique_tasks: bool = True
+    do_save_findings: bool = True
 
     aggregation_rule_id: str = ""
 
@@ -163,6 +164,7 @@ class SagePipeline(object):
         self.scan_records["role_file_list"] = role_file_list
         self.scan_records["independent_file_list"] = independent_file_list
         self.scan_records["non_task_scanned_files"] = []
+        self.scan_records["findings"] = []
 
         num = len(project_file_list) + len(role_file_list) + len(independent_file_list)
         target_counts = []
@@ -302,6 +304,10 @@ class SagePipeline(object):
         if output_dir and self.do_save_yml_inventory:
             yml_inventory_path = os.path.join(output_dir, "yml_inventory.json")
             self.save_yml_inventory(yml_inventory_path)
+
+        if output_dir and self.do_save_findings:
+            findings_path = os.path.join(output_dir, "findings.json")
+            self.save_findings(findings_path)
 
         self._clear_scan_records()
 
@@ -497,6 +503,9 @@ class SagePipeline(object):
                         self.scan_records["independent_file_list"][j]["scanned_as"] = _type
                         self.scan_records["non_task_scanned_files"].append(fpath)
 
+            findings = scandata.findings
+            self.scan_records["findings"].append({"target_type": _type, "target_name": name, "findings": findings})
+
         elapsed_for_this_scan = round(time.time() - start_of_this_scan, 2)
         if elapsed_for_this_scan > 60:
             self.logger.warn(f"It took {elapsed_for_this_scan} sec. to process [{i+1}/{num}] {_type} {name}")
@@ -528,7 +537,7 @@ class SagePipeline(object):
                 file["task_scanned"] = task_scanned
                 scanned_as = file.get("scanned_as", "")
                 file["scanned_as"] = scanned_as
-                lines.append(json.dumps(file))
+                lines.append(json.dumps(file) + "\n")
 
         for role_name in self.scan_records["role_file_list"]:
             for file in self.scan_records["role_file_list"][role_name]["files"]:
@@ -536,21 +545,41 @@ class SagePipeline(object):
                 file["task_scanned"] = task_scanned
                 scanned_as = file.get("scanned_as", "")
                 file["scanned_as"] = scanned_as
-                lines.append(json.dumps(file))
+                lines.append(json.dumps(file) + "\n")
 
         for file in self.scan_records["independent_file_list"]:
             task_scanned = file.get("task_scanned", False)
             file["task_scanned"] = task_scanned
             scanned_as = file.get("scanned_as", "")
             file["scanned_as"] = scanned_as
-            lines.append(json.dumps(file))
+            lines.append(json.dumps(file) + "\n")
 
         out_dir = os.path.dirname(output_path)
         if not os.path.exists(out_dir):
             os.makedirs(out_dir, exist_ok=True)
         
         with open(output_path, "w") as outfile:
-            outfile.write("\n".join(lines))
+            outfile.write("".join(lines))
+
+    def save_findings(self, output_path):
+        if not self.scan_records:
+            return
+        if "findings" not in self.scan_records:
+            return
+        
+        findings_list = self.scan_records["findings"]
+        lines = []
+        for d in findings_list:
+            findings = d["findings"]
+            findings_json_str = findings.dump()
+            lines.append(findings_json_str + "\n")
+        
+        out_dir = os.path.dirname(output_path)
+        if not os.path.exists(out_dir):
+            os.makedirs(out_dir, exist_ok=True)
+
+        with open(output_path, "w") as outfile:
+            outfile.write("".join(lines))
 
     def save(self, output_list, filepath):
         if not filepath:

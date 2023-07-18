@@ -115,6 +115,10 @@ def create_node_name_from_obj(obj):
     elif isinstance(obj, Role):
         _type = "Role"
         _name = obj.fqcn
+        if obj.metadata and isinstance(obj.metadata, dict):
+            role_desc = obj.metadata.get("galaxy_info", {}).get("description", "")
+            if role_desc:
+                _name = _name + f" ({role_desc})"
     elif isinstance(obj, TaskFile):
         _type = "TaskFile"
         _name = obj.defined_in

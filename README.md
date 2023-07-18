@@ -5,6 +5,139 @@ Sage is a framework for Ansible repository scan to create graph/intermediate/hig
 - Adding enriched context to existing fine-tuning data set ([link](./doc/enrich-context.md))
 - Creating training dataset for multi-task generation ([link](./doc/new-train-data.md))
 
+## Sage Data Representation
+
+Sage scan the project and create object tree which consists of Ansible specific nodes like
+- collections (all external dependencies)
+- modules (name, fqcn, spec)
+- playbooks (name, comment, filename)
+- plays (name, comment, calling tasks and roles)
+- projects (including playbooks, roles, dependencies, metadata)
+- roles (including taskfiles, role metadata, variables, default, etc)
+- taskfiles (calling tasks)
+- tasks (task spec, callling module)
+
+Each node is represented by unique identifier, and links between the nodes are created by analayzing Ansible specific code semantics. For example, 
+- call hierarlchy from playbook to role --> taskfile - task --> module
+- variable assignment is inferred in a static-analytics fashion
+
+The data is useful to compute rich context information beyond single. For example, 
+- easy to find a pair of two tasks like
+  - task A set a variable `x1` by set-fact or register
+  - task B consumes `x1`
+- easy to create enriched context like
+  - task A is called in taskfile `debian.yml` in role R `ansible-rabbitmq` for `Ansible role to install/configure RabbitMQ`
+  - a set of variables `x1...xn` are avaialble in task B
+
+The data can be accessed by rules at runtime, and the data is exported as knowledge base file (ARI RAM file) for later use. 
+
+```
+{
+  "py/object": "ansible_risk_insight.models.Role",
+  "type": "role",
+  "key": "role collection:debops.debops#role:debops.debops.ansible",
+  "name": "ansible",
+  "defined_in": "roles/ansible",
+  "local_key": "role role:roles/ansible",
+  "fqcn": "debops.debops.ansible",
+  "metadata": {
+    "collections": [
+      "debops.debops"
+    ],
+    "dependencies": [],
+    "galaxy_info": {
+      "company": "DebOps",
+      "author": "Maciej Delmanowski",
+      "description": "Install Ansible on Debian/Ubuntu host using Ansible",
+      "license": "GPL-3.0-only",
+      "min_ansible_version": "2.4.0",
+      "platforms": [
+        {
+          "name": "Debian",
+          "versions": [
+            "wheezy",
+            "jessie",
+            "stretch",
+            "buster"
+          ]
+        },
+        {
+          "name": "Ubuntu",
+          "versions": [
+            "precise",
+            "trusty",
+            "xenial",
+            "bionic"
+          ]
+        }
+      ],
+      "galaxy_tags": [
+        "ansible"
+      ]
+    }
+  },
+  "collection": "debops.debops",
+  "playbooks": [],
+  "taskfiles": [
+    "taskfile collection:debops.debops#taskfile:roles/ansible/tasks/main.yml"
+  ],
+  "handlers": [],
+  "modules": [],
+  "dependency": {
+    "roles": [],
+    "collections": [
+      "debops.debops"
+    ]
+  },
+  "requirements": {},
+  "source": "",
+  "annotations": {},
+  "default_variables": {
+    "ansible__deploy_type": "{{ \"upstream\" if (ansible_distribution_release in [ \"wheezy\", \"jessie\", \"precise\", \"trusty\", \"xenial\" ]) else \"system\" }}",
+    "ansible__upstream_apt_key": "6125 E2A8 C77F 2818 FB7B D15B 93C4 A3FD 7BB9 C367",
+    "ansible__upstream_apt_repository": "deb http://ppa.launchpad.net/ansible/ansible/ubuntu xenial main",
+    "ansible__base_packages": [
+      "{{ \"ansible\" if (ansible__deploy_type in [ \"system\", \"upstream\" ]) else [] }}"
+    ],
+    "ansible__packages": [],
+    "ansible__bootstrap_version": "devel",
+    "ansible__apt_preferences__dependent_list": [
+      {
+        "package": "ansible",
+        "backports": [
+          "wheezy",
+          "jessie",
+          "stretch",
+          "buster"
+        ],
+        "reason": "Compatibility with upstream release",
+        "by_role": "debops_ansible",
+        "state": "{{ \"absent\" if (ansible__deploy_type == \"upstream\") else \"present\" }}"
+      },
+      {
+        "package": "ansible",
+        "pin": "release o=LP-PPA-ansible-ansible",
+        "priority": "600",
+        "by_role": "debops_ansible",
+        "filename": "debops_ansible_upstream.pref",
+        "reason": "Recent version from upstream PPA",
+        "state": "{{ \"present\" if (ansible__deploy_type == \"upstream\") else \"absent\" }}"
+      }
+    ],
+    "ansible__keyring__dependent_apt_keys": [
+      {
+        "id": "{{ ansible__upstream_apt_key }}",
+        "repo": "{{ ansible__upstream_apt_repository }}",
+        "state": "{{ \"present\" if (ansible__deploy_type == \"upstream\") else \"absent\" }}"
+      }
+    ]
+  },
+  "variables": {},
+  "loop": {},
+  "options": {}
+}
+```
+
 ## Installation
 
 Run the following command after `git clone`.

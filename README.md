@@ -26,7 +26,12 @@ git clone git@github.com:IBM/Ansible-OpenShift-Provisioning.git
 cd Ansible-OpenShift-Provisioning
 ```
 
-1. do custom scan for the repository
+2. configure ARI KB
+```
+export ARI_KB_DATA_DIR=/Users/mue/Downloads/ram-all-20230613/
+```
+
+3. do custom scan for the repository
 ```
 python patterns/custom_scan/custom_scan.py \
   -d /tmp/Ansible-OpenShift-Provisioning \
@@ -42,7 +47,7 @@ output is below
     └── yml_inventory.json  # inventory file including all YAML files
 ```
 
-2. add new context to existing ftdata
+4. add new context to existing ftdata
 ```
 python patterns/enrich_context/tools/add_enrich_context.py \
   --sage-dir /tmp/test/sage_dir \

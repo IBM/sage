@@ -1,0 +1,89 @@
+# Insert begin (by Sage)
+- name: define variables
+  ansible.builtin.set_fact:
+    rabbitmq_config: []
+    rabbitmq_config_ha: false
+    rabbitmq_config_service: false
+    rabbitmq_config_file: etc/rabbitmq/rabbitmq.config.j2
+    rabbitmq_config_env_file: etc/rabbitmq/rabbitmq-env.conf.j2
+    rabbitmq_env_config: {}
+    rabbitmq_debian_repo: 'deb https://dl.bintray.com/rabbitmq/debian {{ ansible_distribution_release
+      }} main #bintray'
+    rabbitmq_debian_repo_key: https://bintray.com/user/downloadSubjectPublicKey?username=rabbitmq
+    rabbitmq_debian_erlang_from_rabbit: true
+    rabbitmq_debian_version_defined: true
+    rabbitmq_debian_version: 3.8.11-1
+    rabbitmq_enable_clustering: false
+    rabbitmq_master: None
+    rabbitmq_erlang_cookie_file: /var/lib/rabbitmq/.erlang.cookie
+    rabbitmq_listen_port: 5672
+    rabbitmq_listeners: []
+    rabbitmq_ssl_enable: false
+    rabbitmq_ssl_port: 5671
+    rabbitmq_ssl_listeners: []
+    rabitmq_ssl_options: {}
+    rabbitmq_redhat_repo_key: https://github.com/rabbitmq/signing-keys/releases/download/2.0/rabbitmq-release-signing-key.asc
+    rabbitmq_redhat_package: rabbitmq-server-{{ rabbitmq_redhat_version }}-1.el{{
+      ansible_distribution_major_version }}.noarch.rpm
+    rabbitmq_redhat_url: https://dl.bintray.com/rabbitmq/rpm/rabbitmq-server/v3.8.x/el/{{
+      ansible_distribution_major_version }}/noarch
+    rabbitmq_redhat_version: 3.8.11
+    rabbitmq_extra_vhosts: []
+    rabbitmq_users:
+    - name: rabbitmqadmin
+      password: rabbitmqadmin
+      vhost: /
+      configure_priv: .*
+      read_priv: .*
+      write_priv: .*
+      tags: administrator
+    result: '{{ result }}'
+- name: Ansible role to install/configure RabbitMQ
+  ansible.builtin.import_role:
+    name: ansible-rabbitmq
+- name: import tasks
+  ansible.builtin.import_tasks:
+    file: tasks/main.yml
+- name: import tasks
+  ansible.builtin.import_tasks:
+    file: tasks/debian.yml
+# Insert end (by Sage)
+- name: debian | Adding Pre-Reqs
+  apt:
+    name:
+    - gnupg2
+    - apt-transport-https
+    state: present
+    update_cache: true
+  become: true
+  register: result
+  until: result is successful
+- name: debian | adding RabbitMQ public GPG key to the apt repo
+  apt_key:
+    url: '{{ rabbitmq_debian_repo_key }}'
+    state: present
+  become: true
+  register: result
+  until: result is successful
+- name: debian | adding RabbitMQ repo
+  apt_repository:
+    repo: '{{ rabbitmq_debian_repo }}'
+    state: present
+  become: true
+  register: result
+  until: result is successful
+- name: debian | add Rabbitmq erlang repo key
+  apt_key:
+    url: https://bintray.com/user/downloadSubjectPublicKey?username=rabbitmq-erlang
+    state: present
+  become: true
+  register: result
+  until: result is successful
+  when: rabbitmq_debian_erlang_from_rabbit
+- name: debian | add Rabbitmq erlang repo
+  apt_repository:
+    repo: deb https://dl.bintray.com/rabbitmq-erlang/debian {{ ansible_distribution_release
+      }} erlang
+    state: present
+  become: true
+  when: rabbitmq_debian_erlang_from_rabbit

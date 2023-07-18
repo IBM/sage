@@ -1,12 +1,9 @@
 # sage
 
-This project is a data pipeline framework and practical examples for generating/processing task data like the fine-tuning data for various purposes.
-
-The pipeline framework utilizes Sage code (content analytics engine from Ansible Risk Insight) to parse Ansible content in YAML files (or prompt string in an existing FT data) and to apply configured rules for processing data depending on use-cases. 
-
-- Creating training data specific to a customer (link)
-- Adding enriched context to existing fine-tuning data set (link)
-- Creating training dataset for multi-task generation (link)
+Sage is a framework for Ansible repository scan to create graph/intermediate/high level representation of data that can be downstream converted to ftdata. The project includes practical examples for generating/processing task data such as 
+- Creating training data specific to a customer repository ([link](./doc/custom-repo-scan.md))
+- Adding enriched context to existing fine-tuning data set ([link](./doc/enrich-context.md))
+- Creating training dataset for multi-task generation ([link](./doc/new-train-data.md))
 
 ## Installation
 

@@ -13,7 +13,7 @@ from ansible_risk_insight.models import (
 
 
 @dataclass
-class FTDataPipelineRule(Rule):
+class FTSagePipelineRule(Rule):
     rule_id: str = "FP001"
     description: str = "aggregate changes by other rules"
     enabled: bool = True

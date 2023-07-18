@@ -1,8 +1,12 @@
-# sage-data-pipeline
+# sage
 
 This project is a data pipeline framework and practical examples for generating/processing task data like the fine-tuning data for various purposes.
 
-The pipeline framework utilizes Ansible Risk Insight to parse Ansible content in YAML files (or prompt string in an existing FT data) and to apply configured rules for processing data depending on use-cases.
+The pipeline framework utilizes Sage code (content analytics engine from Ansible Risk Insight) to parse Ansible content in YAML files (or prompt string in an existing FT data) and to apply configured rules for processing data depending on use-cases. 
+
+- Creating training data specific to a customer (link)
+- Adding enriched context to existing fine-tuning data set (link)
+- Creating training dataset for multi-task generation (link)
 
 ## Installation
 
@@ -74,7 +78,7 @@ output is below
 
 ### Batch scan with source json file
 
-![custom-repo-scan](doc/images/enrich-context.png)
+![enrich-context](doc/images/enrich-context.png)
 
 1. Do custom scan for all GitHub-RHIBM source with source json file.
 ```

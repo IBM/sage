@@ -3,7 +3,7 @@ requires = ["setuptools", "setuptools-scm"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "sage-data-pipeline"
+name = "sage"
 description = "My package description"
 readme = "README.rst"
 requires-python = ">=3.7"
@@ -20,10 +20,10 @@ dependencies = [
 dynamic = ["version"]
 
 [tool.setuptools.dynamic]
-version = {attr = "sage_data_pipeline.__version__.__version__"}
+version = {attr = "sage.__version__.__version__"}
 
 [tool.setuptools]
-py-modules = ["sage_data_pipeline"]
+py-modules = ["sage"]
 
 [tool.black]
 line-length = 150

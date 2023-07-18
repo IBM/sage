@@ -1,4 +1,4 @@
-from sage_data_pipeline.pipeline import DataPipeline
+from sage.pipeline import SagePipeline
 import os
 import argparse
 
@@ -10,7 +10,7 @@ if __name__ == '__main__':
     parser.add_argument("-o", "--out-dir", default="", help="output directory for the rule evaluation result")
     args = parser.parse_args()
 
-    dp = DataPipeline(
+    dp = SagePipeline(
         ari_kb_data_dir=os.getenv("ARI_KB_DATA_DIR", "<PATH/TO/YOUR/ARI_KB_DATA_DIR>"),
         ari_rules_dir=os.path.join(os.path.dirname(__file__), "rules"),
     )

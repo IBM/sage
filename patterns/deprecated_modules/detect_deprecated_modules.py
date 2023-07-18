@@ -8,7 +8,7 @@ from ansible_risk_insight.finder import (
 )
 from ansible_risk_insight.risk_detector import load_rules
 from ansible_risk_insight.utils import escape_local_path
-from sage_data_pipeline.pipeline import DataPipeline
+from sage.pipeline import SagePipeline
 import os
 import argparse
 import time

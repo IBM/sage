@@ -1,11 +1,11 @@
-# Custom Scan with DataPipeline
+# Custom Scan with SagePipeline
 
 ## Running custom scan
 
 1. Install this project
     ```
-    $ git clone https://github.ibm.com/ansible-risk-insight/sage-data-pipeline.git
-    $ cd sage-data-pipeline
+    $ git clone https://github.ibm.com/ansible-risk-insight/sage.git
+    $ cd sage
     $ pip install -e .
     ```
 

@@ -1,8 +1,8 @@
-from sage_data_pipeline.pipeline import DataPipeline
+from sage.pipeline import SagePipeline
 import os
 import json
 import argparse
-from sage_data_pipeline.tools.src_rebuilder import write_result, prepare_source_dir
+from sage.tools.src_rebuilder import write_result, prepare_source_dir
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="TODO")
@@ -58,7 +58,7 @@ if __name__ == "__main__":
 
         print(f"scanning {repo_name} ({count}/{total})")
 
-        dp = DataPipeline(
+        dp = SagePipeline(
             ari_kb_data_dir=os.getenv("ARI_KB_DATA_DIR", "<PATH/TO/YOUR/ARI_KB_DATA_DIR>"),
             ari_rules_dir=os.path.join(os.path.dirname(__file__), "rules"),
         )

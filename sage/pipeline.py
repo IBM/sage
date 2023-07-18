@@ -8,7 +8,7 @@ from ansible_risk_insight.finder import (
     get_project_info_for_file,
 )
 from ansible_risk_insight.utils import escape_local_path
-from sage_data_pipeline.utils import get_rule_id_list
+from sage.utils import get_rule_id_list
 import os
 import time
 import traceback
@@ -70,7 +70,7 @@ class OutputData:
 
 
 @dataclass
-class DataPipeline(object):
+class SagePipeline(object):
     ari_kb_data_dir: str = ""
     ari_rules_dir: str = ""
     ari_rules: list = field(default_factory=list)

@@ -13,7 +13,7 @@ from ansible_risk_insight.models import (
 
 
 @dataclass
-class FTDataPipelineRule(Rule):
+class FTSagePipelineRule(Rule):
     rule_id: str = "FP003"
     description: str = "add module info about deprecation"
     enabled: bool = True

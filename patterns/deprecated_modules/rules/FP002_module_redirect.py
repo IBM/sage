@@ -11,7 +11,7 @@ from ansible_risk_insight.models import (
 
 
 @dataclass
-class FTDataPipelineRule(Rule):
+class FTSagePipelineRule(Rule):
     rule_id: str = "FP002"
     description: str = "add module info about redirect"
     enabled: bool = True

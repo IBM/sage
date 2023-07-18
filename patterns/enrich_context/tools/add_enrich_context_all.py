@@ -85,7 +85,7 @@ class Repo_Writer:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="TODO")
     parser.add_argument("-s", "--sage-dir", help="sage data dir (output dir from scan)")
-    parser.add_argument("-f", "--ftdata", default=None, help='original ftdata file (e.g. "awft_v5.5.2_train.json")')
+    parser.add_argument("-d", "--ftdata-dir", default=None, help="original ftdata dir")
     parser.add_argument("-o", "--out-dir", help="result dir")
     parser.add_argument("-t", "--src-type", help='source type (e.g. "GitHub-RHIBM")')
     args = parser.parse_args()
@@ -97,36 +97,20 @@ if __name__ == "__main__":
 
     out_dir = args.out_dir
     target_src_type = args.src_type
-    w_ftdata_file = args.ftdata
+    ftdata_dir = args.ftdata_dir
 
     repo_names = []
-    if w_ftdata_file is not None and os.path.isfile(w_ftdata_file):
-        src_types = load_source_types(w_ftdata_file)
-        if target_src_type not in src_types:
-            print(f"no src type found in ftdata {w_ftdata_file}")
+    # for f in Path(out_dir).rglob('*/org-ftdata.json'):
+    for f in Path(os.path.join(ftdata_dir, target_src_type)).rglob("*/org-ftdata.json"):
+        if Path.is_file(f):
+            d1 = os.path.dirname(f)
+            s1 = d1.removeprefix(ftdata_dir)
+            a1 = s1.split("/")
+            st = a1[1]
+            rn = "/".join(a1[2:])
+            repo_names.append(rn)
 
-        rw = Repo_Writer(out_dir)
-
-        with open(w_ftdata_file, "r") as f:
-            for line in f:
-                j_content = json.loads(line)
-                src_type = j_content.get("source", None)
-                repo_name = j_content.get("repo_name", None)
-                rw.save_to_buffer(src_type, repo_name, line)
-
-        rw.save_all()
-        repo_names = rw.get_repo_names(target_src_type)
-
-    else:
-        # for f in Path(out_dir).rglob('*/org-ftdata.json'):
-        for f in Path(os.path.join(out_dir, target_src_type)).rglob("*/org-ftdata.json"):
-            if Path.is_file(f):
-                d1 = os.path.dirname(f)
-                s1 = d1.removeprefix(out_dir)
-                a1 = s1.split("/")
-                st = a1[1]
-                rn = "/".join(a1[2:])
-                repo_names.append(rn)
+    print(repo_names)
 
     for repo_name in repo_names:
         print(f"adding context for {repo_name} in {target_src_type}")
@@ -141,9 +125,9 @@ if __name__ == "__main__":
             continue
 
         tmp_sage_ftdata = os.path.join(sage_repo_dir, "ftdata-modified.json")  # with correct path
-        wisdom_input = os.path.join(out_dir, target_src_type, repo_name, "org-ftdata.json")
+        org_ftdata_file = os.path.join(ftdata_dir, target_src_type, repo_name, "org-ftdata.json")
         add_repo_info_from_inventory(inventory_file, sage_ftdata, tmp_sage_ftdata)
         output_dir = os.path.join(out_dir, target_src_type, repo_name)
-        print(f"m.run():wisdom_input={wisdom_input},tmp_sage_ftdata={tmp_sage_ftdata},output_dir={output_dir}")
+        print(f"m.run():org_ftdata_file={org_ftdata_file},tmp_sage_ftdata={tmp_sage_ftdata},output_dir={output_dir}")
         m = Mapping(output_dir)
-        m.run(tmp_sage_ftdata, wisdom_input, target_src_type, repo_name)
+        m.run(tmp_sage_ftdata, org_ftdata_file, target_src_type, repo_name)

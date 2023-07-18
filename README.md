@@ -71,7 +71,7 @@ output is below
 ```
 python patterns/custom_scan/custom_scan_all.py \
   -t GitHub-RHIBM \
-  -i /tmp/RH_IBM_FT_data_GH_api.json \
+  -s /tmp/RH_IBM_FT_data_GH_api.json \
   -o /tmp/batch
 ```
 
@@ -151,13 +151,19 @@ In `src_rb` dir, each repository file structure is reconstructed like below.
     ├── wait_for_cluster_operators
     └── wait_for_install_complete
 ```
+before processing large ftdata, it needs to be splitted per repo_name and source.
+```
+python patterns/enrich_context/tools/split_ftdata.py \
+  -f ~/ftdata/5.5.2/awft_v5.5.2_train.json \
+  -d /tmp/batch/data
+```
 
-batch processing to add new context to existing ftdata
+Then, run batch processing to add new context to existing ftdata
 ```
 python patterns/enrich_context/tools/add_enrich_context_all.py \
   --sage-dir /tmp/batch/results \
-  --ftdata ~/ftdata/5.5.2/awft_v5.5.2_train.json \
-  --out-dir /tmp/batch-test \
+  --ftdata-dir /tmp/batch/data \
+  --out-dir /tmp/batch/tmp \
   -t GitHub-RHIBM
 ```
 

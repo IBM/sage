@@ -25,6 +25,7 @@ class Mapping(object):
         matched_list.extend(similarity_match_list)
 
         modified_wisdom_ftdata = self.add_dense_context(matched_list)
+        os.makedirs(self.output_dir, exist_ok=True)
         export_result(os.path.join(self.output_dir, "modified_ftdata.json"), modified_wisdom_ftdata)
         export_result(os.path.join(self.output_dir, "only_wisdom.json"), only_wisdom)
         return

@@ -18,6 +18,8 @@ You can find some exmaples of usage in [patterns](./patterns/).
 
 ### Single repository scan
 
+![custom-repo-scan](doc/images/custom-repo-scan.png)
+
 1. clone repository (e.g. IBM/Ansible-OpenShift-Provisioning in GitHub-RHIBM)
 
 ```
@@ -71,6 +73,8 @@ output is below
 ```
 
 ### Batch scan with source json file
+
+![custom-repo-scan](doc/images/enrich-context.png)
 
 1. Do custom scan for all GitHub-RHIBM source with source json file.
 ```

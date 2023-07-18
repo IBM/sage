@@ -306,3 +306,10 @@ Then, the new ftdata file is created. The data is identical to original ftdata e
 ├── scan_result.json
 └── yml_inventory.json
 ```
+
+4. Check sage repo scan report
+The scan report can be generated with the following command.
+```python
+python sage/tools/report.py -f report.md
+```
+The report example is [here](./doc/sage-repo-scan-report.md)

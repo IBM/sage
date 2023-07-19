@@ -5,6 +5,9 @@ Sage is a framework for Ansible repository scan to create graph/intermediate/hig
 - Adding enriched context to existing fine-tuning data set ([link](./doc/enrich-context.md))
 - Creating training dataset for multi-task generation ([link](./doc/new-train-data.md))
 
+![sage-overview](doc/images/sage-overview.png)
+
+
 ## Sage Data Representation
 
 Sage scan the project and create object tree which consists of Ansible specific nodes like

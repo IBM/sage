@@ -751,13 +751,13 @@ class PreProcessingRule(Rule):
 
         task_spec["annotations"] = annotations
 
-        is_last_node_for_this_parent = False
-        if ctx.last_item and ctx.is_last_task(task):
-            is_last_node_for_this_parent = True
+        is_last_node_for_this_tree = False
+        if ctx.is_last_task(task):
+            is_last_node_for_this_tree = True
         
         self.data_buffer_ftdata.append(json.dumps(detail, default=serialize))
         self.data_buffer_scan_result.append(jsonpickle.encode(task_spec, make_refs=False, unpicklable=False))
-        if len(self.data_buffer_ftdata) >= self.buffer_size or is_last_node_for_this_parent:
+        if len(self.data_buffer_ftdata) >= self.buffer_size or is_last_node_for_this_tree:
             self.save_data()
 
         return RuleResult(verdict=verdict, detail=detail, file=task.file_info(), rule=self.get_metadata())

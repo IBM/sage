@@ -500,7 +500,7 @@ def generate_new_detail_report(export_path, sage_dir, ft_tmp_dir, org_ft_dir):
     tc_e_total = sum(task_count_enriched.values())
     tc_m_total = 0
     for m in task_count_missing:
-        tc_m_total += m["count"]
+        tc_m_total += task_count_missing[m]["count"]
     # cells.append(tc_f_total)
     cells.append(tc_s_total)
     cells.append(tc_o_total)

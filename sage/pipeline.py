@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 from ansible_risk_insight.scanner import ARIScanner, config, Config
-from ansible_risk_insight.models import NodeResult, RuleResult
+from ansible_risk_insight.models import NodeResult, RuleResult, AnsibleRunContext, Object
 from ansible_risk_insight.finder import (
     find_all_ymls,
     label_yml_file,
@@ -15,6 +15,7 @@ import traceback
 import logging
 import threading
 import json
+import jsonpickle
 
 
 logging.basicConfig()
@@ -68,6 +69,34 @@ class OutputData:
     def serialize(self):
         return json.dumps(self.data)
 
+@dataclass
+class SerializableRunContext(object):
+    targets: list = field(default_factory=list)
+    root_key: str = ""
+    parent: Object = None
+    scan_metadata: dict = field(default_factory=dict)
+    last_item: bool = False
+
+    @classmethod
+    def from_ansible_run_context(cls, rc: AnsibleRunContext):
+        src = cls()
+        src.targets = rc.sequence.items
+        src.root_key = rc.root_key
+        src.parent = rc.parent
+        src.scan_metadata = rc.scan_metadata
+        src.last_item = rc.last_item
+        return src
+    
+    def to_ansible_run_context(self):
+        rc = AnsibleRunContext.from_targets(
+            targets=self.targets,
+            root_key=self.root_key,
+            parent=self.parent,
+            scan_metadata=self.scan_metadata,
+            last_item=self.last_item,
+        )
+        return rc
+
 
 @dataclass
 class SagePipeline(object):
@@ -88,6 +117,7 @@ class SagePipeline(object):
     do_save_yml_inventory: bool = True
     do_save_unique_tasks: bool = True
     do_save_findings: bool = True
+    do_save_result: bool = True
 
     aggregation_rule_id: str = ""
 
@@ -97,6 +127,11 @@ class SagePipeline(object):
 
     accumulate: bool = True
     scan_records: dict = field(default_factory=dict)
+
+    # special scan records
+    yml_inventory: list = field(default_factory=list)
+    run_contexts: list = field(default_factory=list)
+    ftdata: list = field(default_factory=list)
 
     def __post_init__(self):
         if not self.logger:
@@ -301,6 +336,7 @@ class SagePipeline(object):
         else:
             self._single_scan(input_list)
         
+        self.yml_inventory = self.create_yml_inventory()
         if output_dir and self.do_save_yml_inventory:
             yml_inventory_path = os.path.join(output_dir, "yml_inventory.json")
             self.save_yml_inventory(yml_inventory_path)
@@ -312,12 +348,32 @@ class SagePipeline(object):
         self._clear_scan_records()
 
         output_list = self.to_output(**kwargs)
+        self.ftdata = [od.data for od in output_list if isinstance(od, OutputData)]
 
         if output_dir:
             output_path = os.path.join(output_dir, "ftdata.json")
             self.save(output_list, output_path)
 
         self.logger.info("Done")
+
+        run_contexts = []
+        for rc in self.run_contexts:
+            if not isinstance(rc, AnsibleRunContext):
+                continue
+            # jsonpickle has several issues for serializing AnsibleRunContext
+            # so we convert it to a serializable one here
+            src = SerializableRunContext.from_ansible_run_context(rc)
+            run_contexts.append(src)
+        
+        result = {
+            "inventory": self.yml_inventory,
+            "objects": run_contexts,
+            "ftdata": self.ftdata,
+        }
+        if output_dir:
+            output_path = os.path.join(output_dir, "result.json")
+            self.save_result(result, output_path)
+        return result
 
     # TODO: implement this
     def _single_scan(self):
@@ -385,6 +441,9 @@ class SagePipeline(object):
             "independent_file_list": [],
             "non_task_scanned_files": [],
         }
+        self.yml_inventory = []
+        self.run_contexts = []
+        self.ftdata = []
         return
     
     def _clear_scan_records(self):
@@ -506,6 +565,8 @@ class SagePipeline(object):
             findings = scandata.findings
             self.scan_records["findings"].append({"target_type": _type, "target_name": name, "findings": findings})
 
+            self.run_contexts.extend(scandata.contexts)
+
         elapsed_for_this_scan = round(time.time() - start_of_this_scan, 2)
         if elapsed_for_this_scan > 60:
             self.logger.warn(f"It took {elapsed_for_this_scan} sec. to process [{i+1}/{num}] {_type} {name}")
@@ -529,15 +590,15 @@ class SagePipeline(object):
                 all_files.append((fullpath, "play"))
         return all_files
     
-    def save_yml_inventory(self, output_path):
-        lines = []
+    def create_yml_inventory(self):
+        yml_inventory = []
         for project_name in self.scan_records["project_file_list"]:
             for file in self.scan_records["project_file_list"][project_name]["files"]:
                 task_scanned = file.get("task_scanned", False)
                 file["task_scanned"] = task_scanned
                 scanned_as = file.get("scanned_as", "")
                 file["scanned_as"] = scanned_as
-                lines.append(json.dumps(file) + "\n")
+                yml_inventory.append(file)
 
         for role_name in self.scan_records["role_file_list"]:
             for file in self.scan_records["role_file_list"][role_name]["files"]:
@@ -545,14 +606,19 @@ class SagePipeline(object):
                 file["task_scanned"] = task_scanned
                 scanned_as = file.get("scanned_as", "")
                 file["scanned_as"] = scanned_as
-                lines.append(json.dumps(file) + "\n")
+                yml_inventory.append(file)
 
         for file in self.scan_records["independent_file_list"]:
             task_scanned = file.get("task_scanned", False)
             file["task_scanned"] = task_scanned
             scanned_as = file.get("scanned_as", "")
             file["scanned_as"] = scanned_as
-            lines.append(json.dumps(file) + "\n")
+            yml_inventory.append(file)
+        
+        return yml_inventory
+
+    def save_yml_inventory(self, output_path):
+        lines = [json.dumps(file) + "\n" for file in self.yml_inventory]
 
         out_dir = os.path.dirname(output_path)
         if not os.path.exists(out_dir):
@@ -580,6 +646,15 @@ class SagePipeline(object):
 
         with open(output_path, "w") as outfile:
             outfile.write("".join(lines))
+
+    def save_result(self, result_dict, output_path):
+        out_dir = os.path.dirname(output_path)
+        if not os.path.exists(out_dir):
+            os.makedirs(out_dir, exist_ok=True)
+
+        with open(output_path, "w") as outfile:
+            json_str = jsonpickle.encode(result_dict, make_refs=False)
+            outfile.write(json_str)
 
     def save(self, output_list, filepath):
         if not filepath:

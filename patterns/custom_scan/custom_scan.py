@@ -15,7 +15,7 @@ if __name__ == '__main__':
         ari_rules_dir=os.path.join(os.path.dirname(__file__), "rules"),
     )
     os.environ['SAGE_CONTENT_ANALYSIS_OUT_DIR'] = args.out_dir
-    dp.run(
+    result = dp.run(
         target_dir=args.dir,
         output_dir=args.out_dir,
     )

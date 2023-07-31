@@ -40,6 +40,8 @@ class FTSagePipelineRule(Rule):
             if not isinstance(annotation, Annotation):
                 continue
             anno_key = annotation.key
+            if not isinstance(anno_key, str):
+                continue
             if not re.match(change_annotation_pattern, anno_key):
                 continue
             if not isinstance(annotation.value, dict):

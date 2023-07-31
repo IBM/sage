@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+import datetime
 from ansible_risk_insight.scanner import ARIScanner, config, Config
 from ansible_risk_insight.models import NodeResult, RuleResult, AnsibleRunContext, Object
 from ansible_risk_insight.finder import (
@@ -9,6 +10,7 @@ from ansible_risk_insight.finder import (
 )
 from ansible_risk_insight.utils import escape_local_path
 from sage.utils import get_rule_id_list
+from sage.models import convert_to_sage_obj
 import os
 import time
 import traceback
@@ -117,6 +119,8 @@ class SagePipeline(object):
     do_save_yml_inventory: bool = True
     do_save_unique_tasks: bool = True
     do_save_findings: bool = True
+    do_save_metadata: bool = True
+    do_save_objects: bool = True
     do_save_result: bool = True
 
     aggregation_rule_id: str = ""
@@ -176,6 +180,7 @@ class SagePipeline(object):
     def to_input(self, **kwargs):
         if isinstance(kwargs, dict) and "target_dir" in kwargs:
             target_dir = kwargs["target_dir"]
+            self.scan_records["source"] = kwargs.get("source", {})
             return self._target_dir_to_input(target_dir)
         elif isinstance(kwargs, dict) and "ftdata_path" in kwargs:
             ftdata_path = kwargs["ftdata_path"]
@@ -200,6 +205,8 @@ class SagePipeline(object):
         self.scan_records["independent_file_list"] = independent_file_list
         self.scan_records["non_task_scanned_files"] = []
         self.scan_records["findings"] = []
+        self.scan_records["metadata"] = {}
+        self.scan_records["objects"] = []
 
         num = len(project_file_list) + len(role_file_list) + len(independent_file_list)
         target_counts = []
@@ -345,6 +352,14 @@ class SagePipeline(object):
             findings_path = os.path.join(output_dir, "findings.json")
             self.save_findings(findings_path)
 
+        if output_dir and self.do_save_metadata:
+            metadata_path = os.path.join(output_dir, "sage-metadata.json")
+            self.save_metadata(metadata_path)
+
+        if output_dir and self.do_save_objects:
+            objects_path = os.path.join(output_dir, "sage-objects.json")
+            self.save_objects(objects_path)
+
         self._clear_scan_records()
 
         output_list = self.to_output(**kwargs)
@@ -440,6 +455,9 @@ class SagePipeline(object):
             "role_file_list": {},
             "independent_file_list": [],
             "non_task_scanned_files": [],
+            "findings": [],
+            "metadata": {},
+            "objects": [],
         }
         self.yml_inventory = []
         self.run_contexts = []
@@ -461,6 +479,7 @@ class SagePipeline(object):
         path = input_data.path
         original_type = input_data.metadata.get("original_type", _type)
         base_dir = input_data.metadata.get("base_dir", None)
+        source = self.scan_records.get("source", {})
         display_name = name
         if base_dir and name.startswith(base_dir):
             display_name = name.replace(base_dir, "", 1)
@@ -565,6 +584,21 @@ class SagePipeline(object):
             findings = scandata.findings
             self.scan_records["findings"].append({"target_type": _type, "target_name": name, "findings": findings})
 
+            ari_objects = findings.root_definitions.get("definitions", {})
+            for obj_type in ari_objects:
+                ari_objects_per_type = ari_objects[obj_type]
+                for ari_obj in ari_objects_per_type:
+                    sage_obj = convert_to_sage_obj(ari_obj)
+                    if source:
+                        sage_obj.set_source(source)
+                    self.scan_records["objects"].append(sage_obj)
+
+            if _type == "project":
+                metadata = findings.metadata.copy()
+                metadata.pop("time_records")
+                metadata["scan_timestamp"] = datetime.datetime.utcnow().isoformat(timespec="seconds")
+                self.scan_records["metadata"] = metadata
+
             self.run_contexts.extend(scandata.contexts)
 
         elapsed_for_this_scan = round(time.time() - start_of_this_scan, 2)
@@ -639,6 +673,40 @@ class SagePipeline(object):
             findings = d["findings"]
             findings_json_str = findings.dump()
             lines.append(findings_json_str + "\n")
+        
+        out_dir = os.path.dirname(output_path)
+        if not os.path.exists(out_dir):
+            os.makedirs(out_dir, exist_ok=True)
+
+        with open(output_path, "w") as outfile:
+            outfile.write("".join(lines))
+
+    def save_metadata(self, output_path):
+        if not self.scan_records:
+            return
+        if "metadata" not in self.scan_records:
+            return
+        
+        metadata = self.scan_records["metadata"]
+        
+        out_dir = os.path.dirname(output_path)
+        if not os.path.exists(out_dir):
+            os.makedirs(out_dir, exist_ok=True)
+
+        with open(output_path, "w") as outfile:
+            outfile.write(json.dumps(metadata))
+
+    def save_objects(self, output_path):
+        if not self.scan_records:
+            return
+        if "objects" not in self.scan_records:
+            return
+        
+        objects = self.scan_records["objects"]
+        lines = []
+        for obj in objects:
+            obj_json = jsonpickle.encode(obj, make_refs=False)
+            lines.append(obj_json + "\n")
         
         out_dir = os.path.dirname(output_path)
         if not os.path.exists(out_dir):

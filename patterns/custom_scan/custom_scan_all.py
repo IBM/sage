@@ -4,6 +4,16 @@ import json
 import argparse
 from sage.tools.src_rebuilder import write_result, prepare_source_dir
 
+
+ARI_KB_DATA_DIR = os.getenv("ARI_KB_DATA_DIR", None)
+
+if ARI_KB_DATA_DIR is None:
+    raise ValueError(f"Please specify an existing ARI KB dir by an env param:\n$ export ARI_KB_DATA_DIR=<PATH/TO/ARI_KB_DATA_DIR>")
+
+if not os.path.exists(ARI_KB_DATA_DIR):
+    raise ValueError(f"the ARI_KB_DATA_DIR does not exist: {ARI_KB_DATA_DIR}")
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="TODO")
     parser.add_argument("-t", "--source-type", help='source type (e.g."GitHub-RHIBM")')
@@ -65,12 +75,13 @@ if __name__ == "__main__":
         print(f"scanning {repo_name} ({count}/{total})")
 
         dp = SagePipeline(
-            ari_kb_data_dir=os.getenv("ARI_KB_DATA_DIR", "<PATH/TO/YOUR/ARI_KB_DATA_DIR>"),
+            ari_kb_data_dir=ARI_KB_DATA_DIR,
             ari_rules_dir=os.path.join(os.path.dirname(__file__), "rules"),
         )
 
         dp.run(
             target_dir=tdir,
             output_dir=odir,
+            source={"type": src_type, "repo_name": repo_name},
         )
         count += 1

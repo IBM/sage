@@ -144,3 +144,35 @@ def get_rule_id_list(rules_dir=""):
     rules = load_rules(rules_dir=rules_dir)
     rule_id_list = [rule.rule_id for rule in rules]
     return rule_id_list
+
+
+def load_new_fidnings_list(fpath):
+    new_findings_list = []
+    with open(fpath, "r") as file:
+        for line in file:
+            new_findings = jsonpickle.decode(line)
+            new_findings_list.append(new_findings)
+            break
+    return new_findings_list
+
+
+def load_new_fidnings(fpath):
+    _list = load_new_fidnings_list(fpath)
+    if not _list:
+        return None
+    return _list[0]
+
+
+def dump_new_findings_list(new_findings_list, fpath):
+    lines = []
+    for new_findings in new_findings_list:
+        new_findings_json_str = jsonpickle.encode(new_findings, make_refs=False)
+        lines.append(new_findings_json_str + "\n")
+        break
+
+    out_dir = os.path.dirname(fpath)
+    if not os.path.exists(out_dir):
+        os.makedirs(out_dir, exist_ok=True)
+
+    with open(fpath, "w") as outfile:
+        outfile.write("".join(lines))

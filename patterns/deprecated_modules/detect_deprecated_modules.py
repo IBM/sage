@@ -112,7 +112,7 @@ class Pipeline(object):
         elapsed = round(time.time() - self.start, 2)
         start_of_this_scan = time.time()
         thread_id = threading.get_native_id()
-        # print(f"[{i+1}/{num}] start {display_name} ({elapsed} sec. elapsed) (thread: {thread_id})")
+        print(f"[{i+1}/{num}] start {display_name} ({elapsed} sec. elapsed) (thread: {thread_id})")
 
         result = None
         scandata = None
@@ -144,6 +144,8 @@ class Pipeline(object):
                 if not isinstance(rule_result, RuleResult):
                     raise ValueError(f"rule_result must be a RuleResult instance, but {type(rule_result)}")
                 
+                if rule_result.error:
+                    print(rule_result.error)
                 detail = rule_result.get_detail()
                 changes = detail.get("changes", {})
         else:

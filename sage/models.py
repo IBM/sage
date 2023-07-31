@@ -2,6 +2,7 @@ from dataclasses import dataclass, field
 from typing import List
 import logging
 import json
+import jsonpickle
 from ansible_risk_insight.models import (
     Module as ARIModule,
     Task as ARITask,
@@ -61,7 +62,7 @@ class SageObject(object):
     def set_source(self, source: dict={}):
         self.source = source
         if source:
-            self.source_id = json.dumps(source)
+            self.source_id = json.dumps(source, separators=(',', ':'))
         return
 
 
@@ -240,23 +241,202 @@ class Project(SageObject):
     inventories: list = field(default_factory=list)
     version: str = ""
 
+    @classmethod
+    def from_ari_obj(cls, ari_obj, source: dict={}):
+        instance = super().from_ari_obj(ari_obj, source)
+        instance.key = f"project {instance.source_id}"
+        return instance
 
-def convert_to_sage_obj(ari_obj):
+
+def convert_to_sage_obj(ari_obj, source: dict={}):
     if isinstance(ari_obj, ARIModule):
-        return Module.from_ari_obj(ari_obj)
+        return Module.from_ari_obj(ari_obj, source)
     elif isinstance(ari_obj, ARITask):
-        return Task.from_ari_obj(ari_obj)
+        return Task.from_ari_obj(ari_obj, source)
     elif isinstance(ari_obj, ARITaskFile):
-        return TaskFile.from_ari_obj(ari_obj)
+        return TaskFile.from_ari_obj(ari_obj, source)
     elif isinstance(ari_obj, ARIRole):
-        return Role.from_ari_obj(ari_obj)
+        return Role.from_ari_obj(ari_obj, source)
     elif isinstance(ari_obj, ARIPlaybook):
-        return Playbook.from_ari_obj(ari_obj)
+        return Playbook.from_ari_obj(ari_obj, source)
     elif isinstance(ari_obj, ARIPlay):
-        return Play.from_ari_obj(ari_obj)
+        return Play.from_ari_obj(ari_obj, source)
     elif isinstance(ari_obj, ARICollection):
-        return Collection.from_ari_obj(ari_obj)
+        return Collection.from_ari_obj(ari_obj, source)
     elif isinstance(ari_obj, ARIRepository):
-        return Project.from_ari_obj(ari_obj)
+        return Project.from_ari_obj(ari_obj, source)
     else:
         raise ValueError(f"{type(ari_obj)} is not a supported type for Sage objects")
+
+
+@dataclass
+class SageProject(object):
+    source: dict = field(default_factory=dict)
+    source_id: str = ""
+
+    yml_files: list = field(default_factory=list)
+
+    collections: list = field(default_factory=list)
+    modules: list = field(default_factory=list)
+    playbooks: list = field(default_factory=list)
+    plays: list = field(default_factory=list)
+    projects: list = field(default_factory=list)
+    roles: list = field(default_factory=list)
+    taskfiles: list = field(default_factory=list)
+    tasks: list = field(default_factory=list)
+
+    path: str = ""
+    scan_timestamp: str = ""
+
+    @classmethod
+    def from_source_objects(cls, source: dict, yml_inventory: list, objects: list, metadata: dict):
+        proj = cls()
+        proj.source = source
+        if source:
+            proj.source_id = json.dumps(source, separators=(',', ':'))
+
+        proj.yml_files = yml_inventory
+
+        for obj in objects:
+            proj.add_object(obj)
+
+        proj.path = metadata.get("name", "")
+        proj.scan_timestamp = metadata.get("scan_timestamp", "")
+        return proj
+    
+    def add_object(self, obj: SageObject):
+        obj_type = obj.type + "s"
+        objects_per_type = getattr(self, obj_type, [])
+        objects_per_type.append(obj)
+        setattr(self, obj_type, objects_per_type)
+        return
+
+    def get_object(self, key: str=""):
+        if key:
+            obj_type = get_obj_type(key) + "s"
+            objects_per_type = getattr(self, obj_type, [])
+            for obj in objects_per_type:
+                if obj.key == key:
+                    return obj
+        return None
+    
+    # NOTE: currently this returns only 1 sequence found first
+    def get_call_sequence(self, target: Task):
+        target_key = target.key
+        found = None
+        for p in self.playbooks():
+            call_graph = self._get_call_graph(obj=p)
+            all_keys = [obj.key for obj in call_graph]
+            if target_key in all_keys:
+                found = call_graph
+                break
+        if found:
+            return found
+        return None
+
+    def _get_call_graph(self, obj: SageObject=None, key: str=""):
+        if not obj and not key:
+            raise ValueError("either `obj` or `key` must be non-empty value")
+        
+        if not obj and key:
+            obj = self.get_object(key)
+            if not obj:
+                raise ValueError(f"No object found for key `{key}`")
+            
+        return self._recursive_get_call_graph(obj)
+
+
+    def _get_children_keys_for_graph(self, obj):
+        if isinstance(obj, Playbook):
+            return obj.plays
+        elif isinstance(obj, Role):
+            return obj.taskfiles
+        elif isinstance(obj, Play):
+            roles = []
+            if obj.roles_info:
+                for ri in obj.roles_info:
+                    role_key = ri.get("key", None)
+                    if role_key:
+                        roles.append(role_key)
+            return obj.pre_tasks + obj.tasks + roles + obj.post_tasks
+        elif isinstance(obj, TaskFile):
+            return obj.tasks
+        elif isinstance(obj, Task):
+            if obj.include_info:
+                c_key = obj.include_info.get("key", None)
+                if c_key:
+                    return [c_key]
+        
+        return []
+        
+    def _recursive_get_call_graph(self, obj):
+        call_graph = [obj]
+        children_keys = self._get_children_keys_for_graph(obj)
+        if children_keys:
+            for c_key in children_keys:
+                c_obj = self.get_object(c_key)
+                if not c_obj:
+                    logger.warn(f"No object found for key `{c_key}`; skip this node")
+                    continue
+                sub_graph = self._recursive_get_call_graph(c_obj)
+                call_graph.extend(sub_graph)
+        return call_graph
+    
+    def object_to_key(self):
+        attr_list = [
+            "collections",
+            "modules",
+            "playbooks",
+            "plays",
+            "projects",
+            "roles",
+            "taskfiles",
+            "tasks",
+        ]
+        new_proj = SageProject(
+            source=self.source,
+            source_id=self.source_id,
+            yml_files=self.yml_files,
+            path=self.path,
+            scan_timestamp=self.scan_timestamp,
+        )
+        for attr in attr_list:
+            objects = getattr(self, attr, [])
+            keys = [obj.key for obj in objects]
+            setattr(new_proj, attr, keys)
+        return new_proj
+
+
+@dataclass
+class SageObjects(object):
+    _projects: List[SageProject] = field(default_factory=list)
+
+    def projects(self):
+        return self._projects
+    
+    def project(self, source_type: str="", repo_name: str=""):
+        for proj in self.projects():
+            p_source_type = proj.source.get("type", "")
+            p_repo_name = proj.source.get("repo_name", "")
+            if p_source_type == source_type and p_repo_name == repo_name:
+                return proj
+        return None
+
+
+def load_objects(fpath: str) -> SageObjects:
+    proj_dict = {}
+    with open(fpath, "r") as file:
+        for line in file:
+            obj = jsonpickle.decode(line)
+            if not isinstance(obj, SageObject):
+                raise ValueError(f"expected type: SageObject, detected type: {type(obj)}")
+            source = obj.source
+            source_id = obj.source_id
+            if source_id not in proj_dict:
+                proj_dict[source_id] = SageProject(source=source, source_id=source_id)
+            proj_dict[source_id].add_object(obj)
+    
+    proj_list = [c for c in proj_dict.values()]
+    obj = SageObjects(_projects=proj_list)
+    return obj
+

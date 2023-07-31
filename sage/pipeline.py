@@ -10,7 +10,7 @@ from ansible_risk_insight.finder import (
 )
 from ansible_risk_insight.utils import escape_local_path
 from sage.utils import get_rule_id_list
-from sage.models import convert_to_sage_obj
+from sage.models import convert_to_sage_obj, SageProject
 import os
 import time
 import traceback
@@ -121,7 +121,7 @@ class SagePipeline(object):
     do_save_findings: bool = True
     do_save_metadata: bool = True
     do_save_objects: bool = True
-    do_save_result: bool = True
+    do_save_result: bool = False
 
     aggregation_rule_id: str = ""
 
@@ -385,7 +385,7 @@ class SagePipeline(object):
             "objects": run_contexts,
             "ftdata": self.ftdata,
         }
-        if output_dir:
+        if output_dir and self.do_save_result:
             output_path = os.path.join(output_dir, "result.json")
             self.save_result(result, output_path)
         return result
@@ -588,6 +588,15 @@ class SagePipeline(object):
             for obj_type in ari_objects:
                 ari_objects_per_type = ari_objects[obj_type]
                 for ari_obj in ari_objects_per_type:
+                    sage_obj = convert_to_sage_obj(ari_obj, source)
+                    if source:
+                        sage_obj.set_source(source)
+                    self.scan_records["objects"].append(sage_obj)
+
+            ari_objects = findings.root_definitions.get("definitions", {})
+            for obj_type in ari_objects:
+                ari_objects_per_type = ari_objects[obj_type]
+                for ari_obj in ari_objects_per_type:
                     sage_obj = convert_to_sage_obj(ari_obj)
                     if source:
                         sage_obj.set_source(source)
@@ -687,14 +696,25 @@ class SagePipeline(object):
         if "metadata" not in self.scan_records:
             return
         
-        metadata = self.scan_records["metadata"]
+        source = self.scan_records.get("source", {})
+        yml_inventory = self.yml_inventory
+        objects = self.scan_records.get("objects", [])
+        metadata = self.scan_records.get("metadata", {})
+
+        proj = SageProject.from_source_objects(
+            source=source,
+            yml_inventory=yml_inventory,
+            objects=objects,
+            metadata=metadata,
+        )
+        proj_as_metadata = proj.object_to_key()
         
         out_dir = os.path.dirname(output_path)
         if not os.path.exists(out_dir):
             os.makedirs(out_dir, exist_ok=True)
 
         with open(output_path, "w") as outfile:
-            outfile.write(json.dumps(metadata))
+            outfile.write(jsonpickle.encode(proj_as_metadata, make_refs=False))
 
     def save_objects(self, output_path):
         if not self.scan_records:

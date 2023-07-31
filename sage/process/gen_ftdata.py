@@ -1,12 +1,8 @@
 import os
 import argparse
 import json
-from sage.process.models import load_objects
-from sage.process.utils import get_tasks, get_annotation
-from sage.models import Task, Playbook, TaskFile
-from sage.utils import load_new_fidnings
-from ansible_risk_insight.models import MutableContent
-from ansible_risk_insight.risk_assessment_model import RAMClient
+from sage.process.utils import get_tasks
+from sage.models import Task, Playbook, TaskFile, load_objects
 
 
 def gen_ftdata(task: Task, parent: Playbook | TaskFile):
@@ -51,16 +47,23 @@ def gen_ftdata(task: Task, parent: Playbook | TaskFile):
     prompt = ""
     output_script = yaml_lines
     if task_name:
-        parts = yaml_lines.split(task_name)
-        prompt = parts[0] + task_name
-        output_script = parts[1].lstrip(" ").lstrip("\n")
+        separator = task_name
+        if task_name not in yaml_lines and task_name[-1] == ".":
+            separator = task_name[:-1]
+        parts = yaml_lines.split(separator)
+        if len(parts) >= 2:
+            prompt = parts[0] + task_name
+            output_script = parts[1].lstrip(" ").lstrip("\n")
 
     record["prompt"] = prompt
     record["output_script"] = output_script
 
     parent_yaml = parent.yaml_lines
-    task_line_num = task.line_num_in_file[0]
-    input_script = "\n".join(parent_yaml.splitlines()[:task_line_num])
+    if task.line_num_in_file:
+        task_line_num = task.line_num_in_file[0]
+        input_script = "\n".join(parent_yaml.splitlines()[:task_line_num-1])
+    else:
+        input_script = parent_yaml
     record["input_script"] = input_script
     record["module_name"] = task.module_info.get("fqcn", "")
     record["ari_task_key"] = task.key
@@ -77,24 +80,23 @@ def main():
 
     sage_objects = load_objects(fpath)
     projects = sage_objects.projects()
-    project = projects.filter(source_type="GitHub-RHIBM", repo_name="IBM/Ansible-OpenShift-Provisioning")
-    playbooks = project.playbooks
-    # TODO: determine how to handle roles / taskfiles
-    roles = project.roles
-    taskfiles = project.taskfiles
-
     record_lines = []
-    for p in playbooks:
-        tasks = get_tasks(root=p, project=project)
-        for t in tasks:
-            record = gen_ftdata(task=t, parent=p)
-            record_lines.append(json.dumps(record) + "\n")
 
-    for tf in taskfiles:
-        tasks = get_tasks(root=tf, project=project)
-        for t in tasks:
-            record = gen_ftdata(task=t, parent=tf)
-            record_lines.append(json.dumps(record) + "\n")
+    for project in projects:
+        playbooks = project.playbooks
+        taskfiles = project.taskfiles
+
+        for p in playbooks:
+            tasks = get_tasks(root=p, project=project)
+            for t in tasks:
+                record = gen_ftdata(task=t, parent=p)
+                record_lines.append(json.dumps(record) + "\n")
+
+        for tf in taskfiles:
+            tasks = get_tasks(root=tf, project=project)
+            for t in tasks:
+                record = gen_ftdata(task=t, parent=tf)
+                record_lines.append(json.dumps(record) + "\n")
 
     output_path = args.output
     if output_path:

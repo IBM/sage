@@ -1,5 +1,4 @@
-from sage.models import SageObject, Playbook, TaskFile, Play, Task
-from sage.process.models import SageProject
+from sage.models import SageObject, SageProject, Playbook, TaskFile, Play, Task
 from ansible_risk_insight.models import Annotation
 
 
@@ -46,8 +45,11 @@ def get_tasks_in_file(target: SageObject=None, project: SageProject=None):
     return tasks
 
 
-def get_tasks(root: SageObject, project: SageProject=None):
-    return get_tasks_in_file(target=root, project=project)
+def get_tasks(root: str | SageObject, project: SageProject=None):
+    root_obj = root
+    if isinstance(root, str):
+        root_obj = project.get_object(key=root)
+    return get_tasks_in_file(target=root_obj, project=project)
 
 
 def get_call_sequence(target: Task=None, project: SageProject=None):

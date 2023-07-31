@@ -24,9 +24,9 @@
   - module-specs
   - metadata for collections and roles
   - external dependencies
-- b3: Based on the scan result above, ARI rules can be applied to process the data. For example, fine-tuning dataset can be exported by using a special ARI rule. The record includes
+- b3: Based on the scan result above, custom logic (E.g. [gen_ftdata.py](../sage/process/gen_ftdata.py)) can be applied to process the data. For example, fine-tuning dataset can be exported by using a script above. The record includes
   - prompt
   - input_script (context)
   - output_script (task spec)
 
-  In this step, any ARI rules can be inserted to process the data. For example, data cleaning like post-processing can be applied before writing the record. Customers can also extend it by adding any custom ARI rules to manipulate the dataset. 
+  In this step, any scripts including ARI rules can be inserted to process the data. For example, data cleaning like post-processing can be applied before writing the record. Customers can also extend it by adding any scripts to manipulate the dataset. 

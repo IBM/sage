@@ -633,15 +633,15 @@ def load_json_data(filepath):
         data.append(d)
     return data
 
-def generate_repo_src_type_report(export_path, data_export_path, repo_results):
+def generate_repo_src_type_report(outdir, export_path, data_export_path, repo_results):
     sorted_repo_results = sorted(repo_results, key=lambda x: x["coverage"], reverse=True)
     mdFile = MdUtils(file_name=export_path, title=f'Sage Repo Scan Report - {sorted_repo_results[0]["repo_name"]}')    
     header = ["src_type", "status", "playbooks (recorded/total)", "taskfiles", "roles", "tasks", "task recorded",  "enriched ftdata", "coverage (%)"]
     cells = header
     for data in sorted_repo_results:
-        relative_path = data["detail_report_path"]
-        # if relative_path.startswith("/"):
-        #     relative_path = relative_path.replace("/", "./", 1)
+        relative_path = data["detail_report_path"].replace(outdir, "")
+        if relative_path.startswith("/"):
+            relative_path = relative_path.replace("/", "../../", 1)
         cells.append(f"[{data['src_type']}]({relative_path})")
         cells.append(data["status"])
         cells.append(f"{data['playbook_count_sage']}/{data['playbook_count_total']}")
@@ -691,22 +691,25 @@ def generate_repo_summary_report(outdir, src_type, detail_outdir, subdir):
         os.makedirs(os.path.join(detail_outdir, repo), exist_ok=True)
         detail_md_path = os.path.join(detail_outdir, repo, "README.md")
         detail_data_path = os.path.join(detail_outdir, repo, "summary.json")
-        generate_repo_src_type_report(detail_md_path, detail_data_path, data)
+        generate_repo_src_type_report(outdir, detail_md_path, detail_data_path, data)
+        relative_path = detail_md_path.replace(outdir, "")
+        if relative_path.startswith("/"):
+            relative_path = relative_path.replace("/", "./", 1)
 
         result = {
             "repo_name": repo,
             "status": status,
             "playbook_count_total": data[0]["playbook_count_total"],
-            "playbook_count_sage": sum(v["playbook_count_sage"] for v in data),
+            "playbook_count_sage": data[0]["playbook_count_sage"],
             "taskfile_count_total": data[0]["taskfile_count_total"],
-            "taskfile_count_sage": sum(v["taskfile_count_sage"] for v in data),
+            "taskfile_count_sage": data[0]["taskfile_count_sage"],
             "role_count": data[0]["role_count"],
             "task_count_total": data[0]["task_count_total"],
             "task_count_org": task_count_org,
             "task_count_sage": data[0]["task_count_sage"],
             "task_count_enriched": task_count_enriched,
             "coverage": coverage,
-            "detail_report_path": detail_md_path,
+            "detail_report_path": relative_path,
         }
         repo_summary.append(result)
 
@@ -890,6 +893,8 @@ if __name__ == '__main__':
         "-disambiguate-module-prompt_mutation", 
         "-disambiguate-platform-or-module", 
         "-disambiguate-platform-or-module-prompt_mutation"
+        "-prompt_mutation",
+        "-prompt_mutation-prompt_mutation",
         ]
 
     if not os.path.isdir(outdir):

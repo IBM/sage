@@ -513,9 +513,10 @@ def generate_main_report(org_ftdata_dir, sage_dir, outdir, src_type, org_ftdata_
     if not org_ftdata_type:
         org_ftdata_type = src_type
     
-    os.makedirs(os.path.join(outdir, org_ftdata_type), exist_ok=True)
-    export_path = os.path.join(outdir, org_ftdata_type, "README.md")
-    data_export_path = os.path.join(outdir, org_ftdata_type, "summary.json")
+    report_dir = os.path.join(outdir, org_ftdata_type)
+    os.makedirs(report_dir, exist_ok=True)
+    export_path = os.path.join(report_dir, "README.md")
+    data_export_path = os.path.join(report_dir, "summary.json")
     mdFile = MdUtils(file_name=export_path, title='Sage Repo Scan Report')
 
     results = []
@@ -560,10 +561,8 @@ def generate_main_report(org_ftdata_dir, sage_dir, outdir, src_type, org_ftdata_
         src_type = ss.src_type
         repo_name = ss.repo_name
         detail_report_path = res["detail_report_path"]
-        relative_path = detail_report_path.replace(outdir, "")
-        if relative_path.startswith("/"):
-            relative_path = relative_path.replace("/", "./", 1)
-            cells.append(f"[{repo_name}]({relative_path})")
+        relative_path = os.path.relpath(detail_report_path, report_dir)
+        cells.append(f"[{repo_name}]({relative_path})")
         p = ss.coverage
         status = "x"
         if p == 100 or p == -1:
@@ -633,15 +632,13 @@ def load_json_data(filepath):
         data.append(d)
     return data
 
-def generate_repo_src_type_report(outdir, export_path, data_export_path, repo_results):
+def generate_repo_src_type_report(st_report_dir, export_path, data_export_path, repo_results):
     sorted_repo_results = sorted(repo_results, key=lambda x: x["coverage"], reverse=True)
     mdFile = MdUtils(file_name=export_path, title=f'Sage Repo Scan Report - {sorted_repo_results[0]["repo_name"]}')    
     header = ["src_type", "status", "playbooks (recorded/total)", "taskfiles", "roles", "tasks", "task recorded",  "enriched ftdata", "coverage (%)"]
     cells = header
     for data in sorted_repo_results:
-        relative_path = data["detail_report_path"].replace(outdir, "")
-        if relative_path.startswith("/"):
-            relative_path = relative_path.replace("/", "../../", 1)
+        relative_path = os.path.relpath(data["detail_report_path"], st_report_dir)
         cells.append(f"[{data['src_type']}]({relative_path})")
         cells.append(data["status"])
         cells.append(f"{data['playbook_count_sage']}/{data['playbook_count_total']}")
@@ -664,7 +661,6 @@ def generate_repo_summary_report(outdir, src_type, detail_outdir, subdir):
     files = glob.glob(os.path.join(subdir,f"{src_type}*","summary.json"))
     repo_data = {}
     for f in files:
-        print("generate_repo_summary_report", f)
         summary_data = load_json_data(f)
         data = summary_data[0]["data"]
         for result in data:
@@ -688,13 +684,11 @@ def generate_repo_summary_report(outdir, src_type, detail_outdir, subdir):
             status = "✔"
 
         # generate detail md
-        os.makedirs(os.path.join(detail_outdir, repo), exist_ok=True)
-        detail_md_path = os.path.join(detail_outdir, repo, "README.md")
-        detail_data_path = os.path.join(detail_outdir, repo, "summary.json")
-        generate_repo_src_type_report(outdir, detail_md_path, detail_data_path, data)
-        relative_path = detail_md_path.replace(outdir, "")
-        if relative_path.startswith("/"):
-            relative_path = relative_path.replace("/", "./", 1)
+        st_report_dir = os.path.join(detail_outdir, repo)
+        os.makedirs(st_report_dir, exist_ok=True)
+        detail_md_path = os.path.join(st_report_dir, "README.md")
+        detail_data_path = os.path.join(st_report_dir, "summary.json")
+        generate_repo_src_type_report(st_report_dir, detail_md_path, detail_data_path, data)
 
         result = {
             "repo_name": repo,
@@ -709,7 +703,7 @@ def generate_repo_summary_report(outdir, src_type, detail_outdir, subdir):
             "task_count_sage": data[0]["task_count_sage"],
             "task_count_enriched": task_count_enriched,
             "coverage": coverage,
-            "detail_report_path": relative_path,
+            "detail_report_path": detail_md_path,
         }
         repo_summary.append(result)
 
@@ -721,7 +715,8 @@ def generate_repo_summary_report(outdir, src_type, detail_outdir, subdir):
     header = ["repo_name", "status", "playbooks (recorded/total)", "taskfiles", "roles", "tasks", "task recorded",  "enriched ftdata", "coverage (%)"]
     cells = header
     for data in sorted_repo_summary:
-        cells.append(f'[{data["repo_name"]}]({data["detail_report_path"]})')
+        relative_path = os.path.relpath(data["detail_report_path"], outdir)
+        cells.append(f'[{data["repo_name"]}]({relative_path})')
         cells.append(data["status"])
         cells.append(f"{data['playbook_count_sage']}/{data['playbook_count_total']}")
         cells.append(f"{data['taskfile_count_sage']}/{data['taskfile_count_total']}")
@@ -892,7 +887,7 @@ if __name__ == '__main__':
         "-disambiguate-module", 
         "-disambiguate-module-prompt_mutation", 
         "-disambiguate-platform-or-module", 
-        "-disambiguate-platform-or-module-prompt_mutation"
+        "-disambiguate-platform-or-module-prompt_mutation",
         "-prompt_mutation",
         "-prompt_mutation-prompt_mutation",
         ]

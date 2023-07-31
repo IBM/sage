@@ -104,7 +104,7 @@ if __name__ == "__main__":
         "-disambiguate-module", 
         "-disambiguate-module-prompt_mutation", 
         "-disambiguate-platform-or-module", 
-        "-disambiguate-platform-or-module-prompt_mutation"
+        "-disambiguate-platform-or-module-prompt_mutation",
         "-prompt_mutation",
         "-prompt_mutation-prompt_mutation",
         ]

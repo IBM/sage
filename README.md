@@ -290,29 +290,31 @@ After running the command above, the ftdata is stored in a directory per reposit
 python patterns/enrich_context/tools/add_enrich_context_all.py \
   --sage-dir /tmp/batch/results \
   --ftdata-dir /tmp/ftdata/5.5.2 \
-  --out-dir /tmp/batch/tmp \
   -t GitHub-RHIBM
 ```
 
-Intenrally, ftdata generated at b2 is mapped with original ftdata by using similarity matching, and then relevant task is updated.
+Internally, ftdata generated at b2 is mapped with original ftdata by using similarity matching, and then relevant task is updated.  
+Then, the new ftdata file is created. The data is identical to original ftdata except addition a new context value. 
 ```
-/tmp/batch/tmp/GitHub-RHIBM/IBM/Ansible-OpenShift-Provisioning
-├── modified_ftdata.json   # only updated tasks included
-└── only_org_ftdata.json   # unchanged tasks included
-```
-
-Then, the new ftdata file is created. The data is identical to original ftdata except additiona new context value. 
-```
-/tmp/batch/results/GitHub-RHIBM/IBM/Ansible-OpenShift-Provisioning
-├── ftdata-modified.json  # new ftdata (new context added)
+/tmp/batch/results/GitHub-RHIBM/IBM/Ansible-OpenShift-Provisioning/
+├── _modified_ftdata.json  # only updated tasks included
+├── _only_org_ftdata.json  # unchanged tasks included
+├── _tmp-ftdata.json  # tmp sage ftdata included
+├── enriched_ftdata.json  # new ftdata (new context added)
+├── findings.json
 ├── ftdata.json
 ├── scan_result.json
 └── yml_inventory.json
+
 ```
 
 4. Check sage repo scan report
 The scan report can be generated with the following command.
-```python
-python sage/tools/report.py -f report.md
 ```
-The report example is [here](./doc/sage-repo-scan-report.md)
+python sage/tools/report.py \
+   --sage-dir /tmp/batch/results \
+   -o /tmp/batch/report \
+   -t GitHub-RHIBM \
+   --ft-data-dir /tmp/batch/data
+```
+The report example is [here](https://github.ibm.com/ansible-risk-insight/sage-scan-report/tree/main/report-GitHub-RHIBM)

@@ -86,7 +86,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="TODO")
     parser.add_argument("-s", "--sage-dir", help="sage data dir (output dir from scan)")
     parser.add_argument("-d", "--ftdata-dir", default=None, help="original ftdata dir")
-    parser.add_argument("-o", "--out-dir", help="result dir")
+    # parser.add_argument("-o", "--out-dir", help="result dir")
     parser.add_argument("-t", "--src-type", help='source type (e.g. "GitHub-RHIBM")')
     args = parser.parse_args()
 
@@ -95,10 +95,18 @@ if __name__ == "__main__":
         print(f"no sage_dir exist: {sage_dir}")
         sys.exit()
 
-    out_dir = args.out_dir
     target_src_type = args.src_type
     ftdata_dir = args.ftdata_dir
 
+
+    ftdata_src_type_list = [
+        "",
+        "-disambiguate-module", 
+        "-disambiguate-module-prompt_mutation", 
+        "-disambiguate-platform-or-module", 
+        "-disambiguate-platform-or-module-prompt_mutation"
+        ]
+    
     repo_names = []
     # for f in Path(out_dir).rglob('*/org-ftdata.json'):
     for f in Path(os.path.join(ftdata_dir, target_src_type)).rglob("*/org-ftdata.json"):
@@ -113,21 +121,24 @@ if __name__ == "__main__":
     print(repo_names)
 
     for repo_name in repo_names:
-        print(f"adding context for {repo_name} in {target_src_type}")
-        sage_repo_dir = os.path.join(sage_dir, target_src_type, repo_name)
-        inventory_file = os.path.join(sage_repo_dir, "yml_inventory.json")
-        sage_ftdata = os.path.join(sage_repo_dir, "ftdata.json")
-        if not os.path.isfile(inventory_file):
-            print(f"no inventory file {inventory_file}")
-            continue
-        if not os.path.isfile(sage_ftdata):
-            print(f"no sage ftdata file {sage_ftdata}")
-            continue
+        for fst in ftdata_src_type_list:
+            ftdata_src_type = f"{target_src_type}{fst}"
+            print(f"adding context for {repo_name} in {ftdata_src_type}")
+            sage_repo_dir = os.path.join(sage_dir, target_src_type, repo_name)
+            inventory_file = os.path.join(sage_repo_dir, "yml_inventory.json")
+            sage_ftdata = os.path.join(sage_repo_dir, "ftdata.json")
+            if not os.path.isfile(inventory_file):
+                print(f"no inventory file {inventory_file}")
+                continue
+            if not os.path.isfile(sage_ftdata):
+                print(f"no sage ftdata file {sage_ftdata}")
+                continue
 
-        tmp_sage_ftdata = os.path.join(sage_repo_dir, "ftdata-modified.json")  # with correct path
-        org_ftdata_file = os.path.join(ftdata_dir, target_src_type, repo_name, "org-ftdata.json")
-        add_repo_info_from_inventory(inventory_file, sage_ftdata, tmp_sage_ftdata)
-        output_dir = os.path.join(out_dir, target_src_type, repo_name)
-        print(f"m.run():org_ftdata_file={org_ftdata_file},tmp_sage_ftdata={tmp_sage_ftdata},output_dir={output_dir}")
-        m = Mapping(output_dir)
-        m.run(tmp_sage_ftdata, org_ftdata_file, target_src_type, repo_name)
+            tmp_sage_ftdata = os.path.join(sage_repo_dir, "_tmp-ftdata.json")  # with correct path
+            org_ftdata_file = os.path.join(ftdata_dir, ftdata_src_type, repo_name, "org-ftdata.json")
+            if not os.path.exists(org_ftdata_file):
+                continue
+            add_repo_info_from_inventory(inventory_file, sage_ftdata, tmp_sage_ftdata)
+            print(f"m.run():org_ftdata_file={org_ftdata_file},tmp_sage_ftdata={tmp_sage_ftdata},output_dir={sage_repo_dir}")
+            m = Mapping(sage_repo_dir)
+            m.run(tmp_sage_ftdata, org_ftdata_file, target_src_type, repo_name, ftdata_src_type)

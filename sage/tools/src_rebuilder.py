@@ -6,7 +6,7 @@ import os
 from dataclasses import dataclass, field
 
 
-def prepare_source_dir(root_dir, type, yaml_file):
+def prepare_source_dir(root_dir, yaml_file):
     path_list = []
     if not os.path.exists(root_dir):
         os.makedirs(root_dir)
@@ -46,6 +46,8 @@ def prepare_source_dir(root_dir, type, yaml_file):
         if type == "collection_role":
             namespace_name = content.get("namespace_name")
             path = content.get("path")
+            if path == "":
+                path = "example.yml"
             text = content.get("text")
             source = content.get("source")
             license = content.get("license")

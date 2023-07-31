@@ -24,9 +24,10 @@ if __name__ == "__main__":
     os.makedirs(result_dir, exist_ok=True)
 
     adir = os.path.join(src_rb_dir, src_type)
-    outfile = os.path.join(path_list_dir, f"path-list-{src_type}.txt")
-    path_list = prepare_source_dir(adir, "project", src_json)
-    write_result(outfile, path_list)
+    if not os.path.exists(adir) or len(os.listdir(adir)) == 0:
+        outfile = os.path.join(path_list_dir, f"path-list-{src_type}.txt")
+        path_list = prepare_source_dir(adir, src_json)
+        write_result(outfile, path_list)
 
     with open(src_json, "r") as f:
         records = f.readlines()
@@ -35,6 +36,8 @@ if __name__ == "__main__":
         r = json.loads(record)
         if "repo_name" in r:
             repo_names.add(r.get("repo_name"))
+        if "namespace_name" in r:
+            repo_names.add(r.get("namespace_name"))
 
     total = len(repo_names)
     count = 0
@@ -52,6 +55,9 @@ if __name__ == "__main__":
 
         tdir = os.path.join(src_rb_dir, src_type, repo_name)
         odir = os.path.join(result_dir, src_type, repo_name)
+        if os.path.exists(os.path.join(odir, "ftdata.json")):
+            count += 1
+            continue
 
         # why needed?
         os.environ["SAGE_CONTENT_ANALYSIS_OUT_DIR"] = odir

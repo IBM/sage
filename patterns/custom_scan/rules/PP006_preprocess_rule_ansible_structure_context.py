@@ -4,6 +4,7 @@ import threading
 import distutils
 from datetime import date, time
 from dataclasses import dataclass, field
+import ruamel.yaml
 
 from ansible_risk_insight.models import (
     AnsibleRunContext,
@@ -367,7 +368,7 @@ def get_module_name(task):
         elif short_name == "include":
             module = "ansible.builtin.include"
 
-    if not module:
+    if not module or "." in task.spec.module:
         module = task.spec.module
 
     return module
@@ -488,15 +489,15 @@ def make_task_format_context(file_type, context_data, defined_vars, parents):
             updated = True
         
         import_context_tasks = make_import_context(parents)
-        if len(import_context_tasks) > 0:
+        if len(import_context_tasks) != 0:
             updated = True
-        context_tasks.extend(import_context_tasks)
+            context_tasks.extend(import_context_tasks)
         context_tasks.extend(context_data)
-        context_yml = yaml.dump(context_tasks, sort_keys=False)
+        # context_yml = yaml.dump(context_tasks, sort_keys=False)
+        context_yml = ruamel.yaml.dump(context_tasks, Dumper=ruamel.yaml.RoundTripDumper)
 
     elif file_type == "playbook":
         context_tasks = make_import_context(parents)
-
         play = context_data[-1]
         if defined_vars:
             if "vars" not in play:
@@ -518,7 +519,8 @@ def make_task_format_context(file_type, context_data, defined_vars, parents):
                     play[play_keyword] = context_tasks
                     break
         context_data[-1] = play
-        context_yml = yaml.dump(context_data, sort_keys=False)
+        # context_yml = yaml.dump(context_data, sort_keys=False)
+        context_yml = ruamel.yaml.dump(context_data, Dumper=ruamel.yaml.RoundTripDumper)
     # print("dense context\n", context_yml)
     return context_yml, updated
 
@@ -688,6 +690,8 @@ class PreProcessingRule(Rule):
 
         # input_script = json.dumps(wisdom_context, default=serialize)
         train["input_script"] = yaml_before_task
+        if not context_updated:
+            ari_new_context = yaml_before_task
         train["ari_new_context"] = ari_new_context
         train["is_context_updated"] = context_updated
         train["context_len"] = len(ari_new_context)
@@ -699,9 +703,16 @@ class PreProcessingRule(Rule):
         train["repo_name"] = ""
         train["type"] = file_type
         train["scan_type"] = getattr(task.spec, "type", "")
-        task_str = getattr(task.spec, "yaml_lines", "")
-        if "<<:" in task_str:
-            task_str = task.spec.yaml(use_yaml_lines=False)
+
+        need_correction = task.get_annotation(key="module.need_correction")
+        if need_correction and "." not in task.spec.module:
+            content = task.content
+            content.set_module_name(module)
+            task_str = content.yaml()
+        else:
+            task_str = getattr(task.spec, "yaml_lines", "")
+            if "<<:" in task_str:
+                task_str = task.spec.yaml(use_yaml_lines=False)
         train["output_script"] = task_str
         train["module_name"] = module
         train["id"] = f"{current_id}-{current_depth}"  # <ari_node_id> - <ari_node_depth>

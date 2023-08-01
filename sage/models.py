@@ -132,6 +132,7 @@ class TaskFile(SageObject):
     variables: dict = field(default_factory=dict)
     module_defaults: dict = field(default_factory=dict)
     options: dict = field(default_factory=dict)
+    task_loading: dict = field(default_factory=dict)
 
 
 @dataclass
@@ -196,6 +197,7 @@ class Play(SageObject):
 
     # embed this data when role is resolved
     roles_info: list = field(default_factory=list)
+    task_loading: dict = field(default_factory=dict)
 
 
 @dataclass
@@ -269,6 +271,18 @@ def convert_to_sage_obj(ari_obj, source: dict={}):
         raise ValueError(f"{type(ari_obj)} is not a supported type for Sage objects")
 
 
+attr_list = [
+    "collections",
+    "modules",
+    "playbooks",
+    "plays",
+    "projects",
+    "roles",
+    "taskfiles",
+    "tasks",
+]
+
+
 @dataclass
 class SageProject(object):
     source: dict = field(default_factory=dict)
@@ -287,6 +301,7 @@ class SageProject(object):
 
     path: str = ""
     scan_timestamp: str = ""
+    pipeline_version: str = ""
 
     @classmethod
     def from_source_objects(cls, source: dict, yml_inventory: list, objects: list, metadata: dict):
@@ -302,6 +317,7 @@ class SageProject(object):
 
         proj.path = metadata.get("name", "")
         proj.scan_timestamp = metadata.get("scan_timestamp", "")
+        proj.pipeline_version = metadata.get("pipeline_version", "")
         return proj
     
     def add_object(self, obj: SageObject):
@@ -383,16 +399,7 @@ class SageProject(object):
         return call_graph
     
     def object_to_key(self):
-        attr_list = [
-            "collections",
-            "modules",
-            "playbooks",
-            "plays",
-            "projects",
-            "roles",
-            "taskfiles",
-            "tasks",
-        ]
+        
         new_proj = SageProject(
             source=self.source,
             source_id=self.source_id,
@@ -405,6 +412,21 @@ class SageProject(object):
             keys = [obj.key for obj in objects]
             setattr(new_proj, attr, keys)
         return new_proj
+    
+    def metadata(self):
+        objects = {}
+        for attr in attr_list:
+            objects_per_type = getattr(self, attr, [])
+            objects[attr] = len(objects_per_type)
+        return {
+            "source": self.source,
+            "source_id": self.source_id,
+            "objects": objects,
+            "path": self.path,
+            "scan_timestamp": self.scan_timestamp,
+            "pipeline_version": self.pipeline_version,
+            "yml_files": self.yml_files,
+        }
 
 
 @dataclass

@@ -9,7 +9,7 @@ from ansible_risk_insight.finder import (
     get_project_info_for_file,
 )
 from ansible_risk_insight.utils import escape_local_path
-from sage.utils import get_rule_id_list
+from sage.utils import get_rule_id_list, get_git_version
 from sage.models import convert_to_sage_obj, SageProject
 import os
 import time
@@ -593,19 +593,11 @@ class SagePipeline(object):
                         sage_obj.set_source(source)
                     self.scan_records["objects"].append(sage_obj)
 
-            ari_objects = findings.root_definitions.get("definitions", {})
-            for obj_type in ari_objects:
-                ari_objects_per_type = ari_objects[obj_type]
-                for ari_obj in ari_objects_per_type:
-                    sage_obj = convert_to_sage_obj(ari_obj)
-                    if source:
-                        sage_obj.set_source(source)
-                    self.scan_records["objects"].append(sage_obj)
-
             if _type == "project":
                 metadata = findings.metadata.copy()
                 metadata.pop("time_records")
                 metadata["scan_timestamp"] = datetime.datetime.utcnow().isoformat(timespec="seconds")
+                metadata["pipeline_version"] = get_git_version()
                 self.scan_records["metadata"] = metadata
 
             self.run_contexts.extend(scandata.contexts)
@@ -707,14 +699,14 @@ class SagePipeline(object):
             objects=objects,
             metadata=metadata,
         )
-        proj_as_metadata = proj.object_to_key()
+        proj_metadata = proj.metadata()
         
         out_dir = os.path.dirname(output_path)
         if not os.path.exists(out_dir):
             os.makedirs(out_dir, exist_ok=True)
 
         with open(output_path, "w") as outfile:
-            outfile.write(jsonpickle.encode(proj_as_metadata, make_refs=False))
+            outfile.write(jsonpickle.encode(proj_metadata, make_refs=False, separators=(',', ':')))
 
     def save_objects(self, output_path):
         if not self.scan_records:
@@ -725,7 +717,7 @@ class SagePipeline(object):
         objects = self.scan_records["objects"]
         lines = []
         for obj in objects:
-            obj_json = jsonpickle.encode(obj, make_refs=False)
+            obj_json = jsonpickle.encode(obj, make_refs=False, separators=(',', ':'))
             lines.append(obj_json + "\n")
         
         out_dir = os.path.dirname(output_path)
@@ -741,7 +733,7 @@ class SagePipeline(object):
             os.makedirs(out_dir, exist_ok=True)
 
         with open(output_path, "w") as outfile:
-            json_str = jsonpickle.encode(result_dict, make_refs=False)
+            json_str = jsonpickle.encode(result_dict, make_refs=False, separators=(',', ':'))
             outfile.write(json_str)
 
     def save(self, output_list, filepath):
@@ -763,7 +755,7 @@ def get_yml_label(file_path, root_path):
     if relative_path[-1] == "/":
         relative_path = relative_path[:-1]
     
-    label, error = label_yml_file(file_path)
+    label, name_count, error = label_yml_file(file_path)
     role_name, role_path = get_role_info_from_path(file_path)
     role_info = None
     if role_name and role_path:
@@ -778,14 +770,14 @@ def get_yml_label(file_path, root_path):
     if error:
         logger.debug(f"failed to get yml label:\n {error}")
         label = "error"
-    return label, role_info, project_info
+    return label, role_info, project_info, name_count, error
 
 
 def get_yml_list(root_dir: str):
     found_ymls = find_all_ymls(root_dir)
     all_files = []
     for yml_path in found_ymls:
-        label, role_info, project_info = get_yml_label(yml_path, root_dir)
+        label, role_info, project_info, name_count, error = get_yml_label(yml_path, root_dir)
         if not role_info:
             role_info = {}
         if not project_info:
@@ -804,6 +796,8 @@ def get_yml_list(root_dir: str):
             "project_info": project_info,
             "in_role": in_role,
             "in_project": in_project,
+            "name_count": name_count,
+            "error": error,
         })
     return all_files
 
@@ -820,6 +814,8 @@ def create_scan_list(yml_inventory):
         in_role = yml_data["in_role"]
         project_info = yml_data["project_info"]
         in_project = yml_data["in_project"]
+        name_count = yml_data["name_count"]
+        error = yml_data["error"]
         if project_info:
             p_name = project_info.get("name", "")
             p_path = project_info.get("path", "")
@@ -833,6 +829,8 @@ def create_scan_list(yml_inventory):
                 "role_info": role_info,
                 "in_project": in_project,
                 "in_role": in_role,
+                "name_count": name_count,
+                "error": error,
             })
         elif role_info:
             r_name = role_info.get("name", "")
@@ -849,6 +847,8 @@ def create_scan_list(yml_inventory):
                 "role_info": role_info,
                 "in_project": in_project,
                 "in_role": in_role,
+                "name_count": name_count,
+                "error": error,
             })
         else:
             independent_file_list.append({
@@ -859,5 +859,7 @@ def create_scan_list(yml_inventory):
                 "role_info": role_info,
                 "in_project": in_project,
                 "in_role": in_role,
+                "name_count": name_count,
+                "error": error,
             })
     return project_file_list, role_file_list, independent_file_list

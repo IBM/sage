@@ -25,6 +25,8 @@ from ansible_risk_insight.finder import (
 from ansible_risk_insight.utils import escape_local_path
 from ansible_risk_insight.risk_detector import load_rules
 import os
+import pathlib
+import pygit2
 import argparse
 import time
 import traceback
@@ -32,6 +34,17 @@ import joblib
 import threading
 import jsonpickle
 import json
+
+
+def get_git_version():
+    version = ""
+    try:
+        repo_dir = pathlib.Path(__file__).parent.parent.resolve()
+        repo = pygit2.Repository(repo_dir)
+        version = str(repo.head.target)
+    except Exception:
+        pass
+    return version
 
 
 def get_yml_label(file_path, root_path):

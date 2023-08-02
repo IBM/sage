@@ -1,8 +1,10 @@
 from sage.pipeline import SagePipeline
 import os
 import json
+import time
 import argparse
 from sage.tools.src_rebuilder import write_result, prepare_source_dir
+from ansible_risk_insight.scanner import ARIScanner, Config
 
 
 ARI_KB_DATA_DIR = os.getenv("ARI_KB_DATA_DIR", None)
@@ -57,12 +59,19 @@ if __name__ == "__main__":
         "RedHatOfficial/ansible-role-rhv4-rhvh-stig",
     ]
 
+    dp = SagePipeline(
+        ari_kb_data_dir=ARI_KB_DATA_DIR,
+        ari_rules_dir=os.path.join(os.path.dirname(__file__), "rules"),
+    )
+
+    timer_path = "/tmp/custom-scan-all-timer.json"
     for repo_name in repo_names:
         if repo_name in out_scope:
             print(f"skip {repo_name} ({count}/{total})")
             count += 1
             continue
 
+        start = time.time()
         tdir = os.path.join(src_rb_dir, src_type, repo_name)
         odir = os.path.join(result_dir, src_type, repo_name)
         if os.path.exists(os.path.join(odir, "ftdata.json")):
@@ -74,14 +83,19 @@ if __name__ == "__main__":
 
         print(f"scanning {repo_name} ({count}/{total})")
 
-        dp = SagePipeline(
-            ari_kb_data_dir=ARI_KB_DATA_DIR,
-            ari_rules_dir=os.path.join(os.path.dirname(__file__), "rules"),
-        )
-
         dp.run(
             target_dir=tdir,
             output_dir=odir,
             source={"type": src_type, "repo_name": repo_name},
         )
         count += 1
+
+        end = time.time()
+        elapsed = end - start
+        timer_record = {
+            "repo_name": repo_name,
+            "elapsed": elapsed,
+        }
+        with open(timer_path, "a+") as file:
+            file.write(json.dumps(timer_record) + "\n")
+        

@@ -22,6 +22,7 @@ from ansible_risk_insight.models import (
     Variable,
     VariableType,
 )
+import ansible_risk_insight.yaml as ariyaml
 import os
 import re
 
@@ -287,6 +288,8 @@ def get_defined_vars_in_parent(ctx, task):
     used_vars_name_value = {}
     defined_var_names = []
 
+    registered_var = VariableType.RegisteredVars.name
+
     for node in ctx_1:
         # skip non-task node
         if node.type != RunTargetType.Task:
@@ -300,19 +303,19 @@ def get_defined_vars_in_parent(ctx, task):
         for d_vars in node.variable_set.values():
             if type(d_vars) == list:
                 for dv in d_vars:
-                    if dv.value is not None and dv.type != VariableType.RegisteredVars:
+                    if dv.value is not None and dv.type.name != registered_var:
                         defined_vars_name_value[dv.name] = dv.value
             elif d_vars:
-                if d_vars.value is not None and dv.type != VariableType.RegisteredVars:
+                if d_vars.value is not None and dv.type.name != registered_var:
                     defined_vars_name_value[d_vars.name] = d_vars.value
 
         for u_vars in node.variable_use.values():
             if type(u_vars) == list:
                 for uv in u_vars:
-                    if uv.value is not None and uv.type != VariableType.RegisteredVars:
+                    if uv.value is not None and uv.type.name != registered_var:
                         used_vars_name_value[uv.name] = uv.value
             elif u_vars:
-                if u_vars.value is not None and uv.type != VariableType.RegisteredVars:
+                if u_vars.value is not None and uv.type.name != registered_var:
                     used_vars_name_value[u_vars.name] = u_vars.value
 
     # get variable values for defined variable names

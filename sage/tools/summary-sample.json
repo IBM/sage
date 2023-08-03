@@ -1,0 +1,59 @@
+{
+  "project_count": 2,
+  "projects": [
+    { 
+        "source": "Galaxy-C",
+        "repo_name": "amazon.aws",
+        "object_file": "results/GitHub-AC/ansible-collections/amazon.aws/sage-objects.json",
+        "metadata_file": "results/GitHub-AC/ansible-collections/amazon.aws/sage-metadata.json"
+    },
+    {
+        "source": "Galaxy-C", 
+        "repo_name": "community.aws",
+        "object_file": "results/GitHub-AC/ansible-collections/community.aws/sage-objects.json",
+        "metadata_file": "results/GitHub-AC/ansible-collections/community.aws/sage-metadata.json"
+    }
+  ],
+  "file_count": {
+    "total": 1000,
+    "scan_failures": 120,
+    "playbooks": {
+      "total": 100,
+      "scanned": 10,
+      "skipped": 30,
+      "skip_reasons": {
+        "non ansible file": 15,
+        "YAMLParseError": 12,
+        "TooManyTasksError": 3
+      },
+      "scan_error": 60,
+      "scan_err_msgs": {
+        "file not scanned": 40,
+        "unknown": 20
+      }
+    },
+    "taskfiles": {
+      "total": 100,
+      "scanned": 10,
+      "skipped": 30,
+      "skip_reasons": {
+        "non ansible file": 15,
+        "YAMLParseError": 12,
+        "TooManyTasksError": 3
+      },
+      "scan_error": 60
+    },
+    "others": {
+      "total": 800,
+      "parse_error": 700
+    }
+  },
+  "role_count": {
+    "total": 40
+  },
+  "task_count": {
+    "total": 1423,
+    "names": 1234
+  },
+  "warning": {}
+}

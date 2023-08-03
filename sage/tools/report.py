@@ -270,8 +270,8 @@ def count_enriched_ftdata(f_org_only, f_matched):
         path = d["path"].lstrip("/")
         missing_task_count[path] = missing_task_count.get(path, 0) + 1
         missing_tasks.append({
-            "file": jo["path"],
-            "prompt": jo["prompt"]
+            "file": d["path"],
+            "prompt": d["prompt"]
         })
     data = []
     if os.path.exists(f_matched):
@@ -459,8 +459,8 @@ def generate_detail_report(export_path, ss: Summary):
         cells.append("-")
         cells.append("-")
         cells.append("-")
-        cells.append("-")
-        cells.append("-")
+        cells.append(file_task_count_org.get(o["path"], "-"))
+        cells.append(file_task_count_missing.get(o["path"], "-"))
         cells.append(o.get("role", ""))
     # add summary table
     header = ["status count", "playbook (recorded/count)", "taskfile (recorded/count)", "task count", "task recorded", "org tasks", "unchanged"]
@@ -804,7 +804,6 @@ def generate_src_type_derivation_summary_report(_type, outdir, subdir):
 
 def generate_top_report(outdir):
     files = glob.glob(f'{outdir}/summary-*st.json')
-    print(files)
     summary = []
     for file in files:
         jd = load_json_data(file)

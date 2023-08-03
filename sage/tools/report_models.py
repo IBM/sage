@@ -13,15 +13,29 @@ def dict_join(dict1, dict2):
             dic[k] = dict2[k]
     return dic
 
+@dataclass_json
+@dataclass
+class FileResult(object):
+    filepath: str = ""
+    type: str = ""
+    name_count: int = 0
+    role: str = ""
+    error: str = ""
+    skip_reason: str = ""
+    in_scope: bool = False
+    scanned: bool = False
+    warning: str = ""
+    scanned_task_count : int = 0
+  
 
 @dataclass_json
 @dataclass
 class ScanCount(object):
-    total: int = -1
-    scanned: int = -1
-    skipped: int = -1
+    total: int = 0
+    scanned: int = 0
+    skipped: int = 0
     skip_reasons: dict = field(default_factory=dict)
-    scan_error: int = -1
+    scan_error: int = 0
     scan_err_msgs: dict = field(default_factory=dict)
 
     @classmethod
@@ -51,8 +65,8 @@ class ScanCount(object):
 @dataclass_json
 @dataclass
 class OtherCount(object):
-    total: int = -1
-    parse_error: int = -1
+    total: int = 0
+    parse_error: int = 0
 
     @classmethod
     def from_dict(cls, obj):
@@ -72,12 +86,35 @@ class OtherCount(object):
 
 @dataclass_json
 @dataclass
+class ErrorCount(object):
+    total: int = 0
+    err_msgs: dict = field(default_factory=dict)
+
+    @classmethod
+    def from_dict(cls, obj):
+        c = cls()
+        c.total = obj.get("total", 0)
+        c.err_msgs = obj.get("err_msgs", {})
+        return c
+
+    def merge(self, obj):
+        if not isinstance(obj, ErrorCount):
+            raise Exception(f"incompatible type: {type(obj)}")
+        obj2 = ErrorCount()
+        obj2.total = self.total + obj.total
+        obj2.err_msgs = dict_join(self.err_msgs, obj.err_msgs)
+        return obj2
+
+
+@dataclass_json
+@dataclass
 class FileCount(object):
-    total: int = -1
-    scan_failures: int = -1
+    total: int = 0
+    scan_failures: int = 0
     playbooks: ScanCount = field(default_factory=ScanCount)
     taskfiles: ScanCount = field(default_factory=ScanCount)
     others: OtherCount = field(default_factory=OtherCount)
+    errors: ErrorCount = field(default_factory=ErrorCount)
 
     @classmethod
     def from_dict(cls, obj):
@@ -87,6 +124,7 @@ class FileCount(object):
         c.playbooks = ScanCount.from_dict(obj.get("playbooks", {}))
         c.taskfiles = ScanCount.from_dict(obj.get("taskfiles", {}))
         c.others = OtherCount.from_dict(obj.get("others", {}))
+        c.errors = ErrorCount.from_dict(obj.get("errors", {}))
         return c
 
     def merge(self, obj):
@@ -98,13 +136,14 @@ class FileCount(object):
         obj2.playbooks = self.playbooks.merge(obj.playbooks)
         obj2.taskfiles = self.taskfiles.merge(obj.taskfiles)
         obj2.others = self.others.merge(obj.others)
+        obj2.errors = self.errors.merge(obj.errors)
         return obj2
 
 
 @dataclass_json
 @dataclass
 class RoleCount(object):
-    total: int = -1
+    total: int = 0
 
     @classmethod
     def from_dict(cls, obj):
@@ -123,8 +162,8 @@ class RoleCount(object):
 @dataclass_json
 @dataclass
 class TaskCount(object):
-    total: int = -1
-    names: int = -1
+    total: int = 0
+    names: int = 0
 
     @classmethod
     def from_dict(cls, obj):
@@ -172,12 +211,13 @@ class ProjectSource(object):
 @dataclass_json
 @dataclass
 class ScanReport(object):
-    project_count: int = -1
+    project_count: int = 0
     projects: List[ProjectSource] = field(default_factory=list)
     file_count: FileCount = field(default_factory=FileCount)
     role_count: RoleCount = field(default_factory=RoleCount)
     task_count: TaskCount = field(default_factory=TaskCount)
     warning: dict = field(default_factory=dict)
+    error: dict = field(default_factory=dict)
 
     @classmethod
     def from_dict(cls, obj):
@@ -186,8 +226,9 @@ class ScanReport(object):
         c.projects = ProjectSource.from_list(obj.get("projects", []))
         c.file_count = FileCount.from_dict(obj.get("file_count", {}))
         c.role_count = RoleCount.from_dict(obj.get("role_count", {}))
-        c.task_count = RoleCount.from_dict(obj.get("task_count", {}))
+        c.task_count = TaskCount.from_dict(obj.get("task_count", {}))
         c.warning = obj.get("warning", {})
+        c.error = obj.get("error", {})
         return c
 
     def merge(self, obj):
@@ -200,6 +241,7 @@ class ScanReport(object):
         obj2.role_count = self.role_count.merge(obj.role_count)
         obj2.task_count = self.task_count.merge(obj.task_count)
         obj2.warning = dict_join(self.warning, obj.warning)
+        obj2.error = dict_join(self.error, obj.error)
         return obj2
 
 

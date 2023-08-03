@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools", "setuptools-scm", "wheel"]
+requires = ["setuptools", "setuptools-scm"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -25,6 +25,7 @@ version = {attr = "sage.__version__.__version__"}
 
 [tool.setuptools]
 py-modules = ["sage"]
+packages = ["sage"]
 
 [tool.black]
 line-length = 150

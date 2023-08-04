@@ -17,14 +17,16 @@ def dict_join(dict1, dict2):
 @dataclass
 class FileResult(object):
     filepath: str = ""
+    path_in_project: str = ""
     type: str = ""
-    name_count: int = 0
     role: str = ""
+    role_path: str = ""
     error: str = ""
     skip_reason: str = ""
     in_scope: bool = False
     scanned: bool = False
     warning: str = ""
+    name_count: int = 0
     scanned_task_count : int = 0
   
 
@@ -66,13 +68,13 @@ class ScanCount(object):
 @dataclass
 class OtherCount(object):
     total: int = 0
-    parse_error: int = 0
+    reason: dict = field(default_factory=dict)
 
     @classmethod
     def from_dict(cls, obj):
         c = cls()
         c.total = obj.get("total", 0)
-        c.parse_error = obj.get("parse_error", 0)
+        c.reason = obj.get("reason", {})
         return c
 
     def merge(self, obj):
@@ -80,7 +82,7 @@ class OtherCount(object):
             raise Exception(f"incompatible type: {type(obj)}")
         obj2 = OtherCount()
         obj2.total = self.total + obj.total
-        obj2.parse_error = self.parse_error + obj.parse_error
+        obj2.reason = dict_join(self.reason, obj.reason)
         return obj2
 
 
@@ -180,6 +182,29 @@ class TaskCount(object):
         obj2.names = self.names + obj.names
         return obj2
 
+@dataclass_json
+@dataclass
+class StateCount(object):
+    success: int = 0
+    fail: int = 0
+    unknown: int = 0
+
+    @classmethod
+    def from_dict(cls, obj):
+        c = cls()
+        c.success = obj.get("success", 0)
+        c.fail = obj.get("fail", 0)
+        c.unknown = obj.get("unknown", 0)
+        return c
+
+    def merge(self, obj):
+        if not isinstance(obj, StateCount):
+            raise Exception(f"incompatible type: {type(obj)}")
+        obj2 = StateCount()
+        obj2.success = self.success + obj.success
+        obj2.fail = self.fail + obj.fail
+        obj2.unknown = self.unknown + obj.unknown
+        return obj2
 
 @dataclass_json
 @dataclass
@@ -218,6 +243,7 @@ class ScanReport(object):
     task_count: TaskCount = field(default_factory=TaskCount)
     warning: dict = field(default_factory=dict)
     error: dict = field(default_factory=dict)
+    state_count: StateCount = field(default_factory=StateCount)
 
     @classmethod
     def from_dict(cls, obj):
@@ -229,6 +255,7 @@ class ScanReport(object):
         c.task_count = TaskCount.from_dict(obj.get("task_count", {}))
         c.warning = obj.get("warning", {})
         c.error = obj.get("error", {})
+        c.state_count = StateCount.from_dict(obj.get("state_count", {}))
         return c
 
     def merge(self, obj):
@@ -242,6 +269,7 @@ class ScanReport(object):
         obj2.task_count = self.task_count.merge(obj.task_count)
         obj2.warning = dict_join(self.warning, obj.warning)
         obj2.error = dict_join(self.error, obj.error)
+        obj2.state_count = self.state_count.merge(obj.state_count)
         return obj2
 
 

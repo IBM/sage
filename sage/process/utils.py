@@ -56,6 +56,24 @@ def get_call_sequence(target: Task=None, project: SageProject=None):
     return project.get_call_sequence(target)
 
 
+def get_task_sequence(
+    playbook: Playbook=None,
+    taskfile: TaskFile=None,
+    project: SageProject=None,
+    ):
+    if not playbook and not taskfile:
+        raise ValueError("either `playbook` or `taskfile` must be specifed")
+    
+    if not project:
+        raise ValueError("`project` must be specified")
+    
+    if playbook:
+        return get_tasks_in_playbook(playbook, project)
+    elif taskfile:
+        return get_tasks_in_taskfile(taskfile, project)
+    return []
+
+
 def get_annotation(obj: SageObject, name: str):
     for anno in obj.annotations:
         print(anno)

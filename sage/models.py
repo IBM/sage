@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import List
+from typing import List, Dict
 import logging
 import json
 import jsonpickle
@@ -29,7 +29,7 @@ class SageObject(object):
     name: str = ""
     source: dict = field(default_factory=dict)
     source_id: str = ""
-    annotations: List[Annotation] = field(default_factory=list)
+    annotations: Dict[str, any] = field(default_factory=dict)
 
     @classmethod
     def from_ari_obj(cls, ari_obj, source: dict={}):

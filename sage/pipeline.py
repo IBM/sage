@@ -404,6 +404,7 @@ class SagePipeline(object):
         # make a list of missing files from the first scan
         missing_files = []
         for project_name in self.scan_records["project_file_list"]:
+            base_dir = self.scan_records["project_file_list"][project_name]["path"]
             for file in self.scan_records["project_file_list"][project_name]["files"]:
                 label = file.get("label", "")
                 filepath = file.get("filepath", "")
@@ -415,9 +416,10 @@ class SagePipeline(object):
                         continue
                     _type = label
                     _name = filepath
-                    missing_files.append((_type, _name, filepath, "project"))
+                    missing_files.append((_type, _name, filepath, base_dir, "project"))
 
         for role_name in self.scan_records["role_file_list"]:
+            base_dir = self.scan_records["role_file_list"][role_name]["path"]
             for file in self.scan_records["role_file_list"][role_name]["files"]:
                 label = file.get("label", "")
                 filepath = file.get("filepath", "")
@@ -429,7 +431,7 @@ class SagePipeline(object):
                         continue
                     _type = label
                     _name = filepath
-                    missing_files.append((_type, _name, filepath, "role"))
+                    missing_files.append((_type, _name, filepath, base_dir, "role"))
         
         self.scan_records["missing_files"] = missing_files
         num_of_missing = len(missing_files)
@@ -440,9 +442,9 @@ class SagePipeline(object):
                 type=_type,
                 name=_name,
                 path=filepath,
-                metadata={"original_type": original_type}
+                metadata={"original_type": original_type, "base_dir": base_dir}
             )
-            for i, (_type, _name, filepath, original_type) in enumerate(missing_files)
+            for i, (_type, _name, filepath, base_dir, original_type) in enumerate(missing_files)
         ]
         start = time.time()
         for input_data in second_input_list:
@@ -519,7 +521,8 @@ class SagePipeline(object):
                 load_all_taskfiles=True,
                 use_src_cache=use_src_cache,
                 taskfile_only=taskfile_only,
-                playbook_only=playbook_only
+                playbook_only=playbook_only,
+                base_dir=base_dir,
             )
             scandata = self.scanner.get_last_scandata()
         except Exception:

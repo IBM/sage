@@ -15,6 +15,22 @@ from report_models import ScanReport, ProjectSource, TaskCount, FileCount, \
 OBJ_FILE="sage-objects.json"
 META_FILE="sage-metadata.json"
 
+class SKIP_REASON:
+    NO_TASK = "no task included"
+    NO_TASK_desc = "no task included in the file"
+    INVALID_TASKFILE = "invalid taskfile"
+    INVALID_PLAYBOOK = "invalid playbook"
+    INVALID_desc = "no Ansible task included and the file not in a valid path in role"
+    EXT_DEP = "external dependency"
+    EXT_DEP_desc = "file is in external dependency role"
+    OTHERS = "other file"
+    OTHERS_desc = "other type file"    
+    MANY_TASKS = "too many tasks"
+    MANY_TASKS_desc = "too many tasks included"
+    YAMLParseError = "invalid yml"
+    YAMLParseError_desc = "unable to parse YAML"
+    UNKNOWN = "unknown"
+
 class Data_Splitter:
     def __init__(self, out_dir, filename) -> None:
         self.out_dir = out_dir
@@ -131,19 +147,19 @@ class ScanResultSummarizer:
                 error_info = yf.get("error", {})
                 error_type = error_info.get("type", "")
                 if error_type == "TooManyTasksError":
-                    fr.skip_reason = "too many tasks"
+                    fr.skip_reason = SKIP_REASON.MANY_TASKS
                     fr.type = "others"
                 elif error_type == "YAMLParseError":
-                    fr.skip_reason = "invalid yml"
+                    fr.skip_reason = SKIP_REASON.YAMLParseError
                     fr.type = "others"
                 else:
                     fr.error = error_type 
                 out_scopes.append(fr)
             elif _type == "others":
-                fr.skip_reason = "other file"
+                fr.skip_reason = SKIP_REASON.OTHERS
                 out_scopes.append(fr)
             elif is_external_dependency:
-                fr.skip_reason = "external dependency"
+                fr.skip_reason = SKIP_REASON.EXT_DEP
                 out_scopes.append(fr)
             else:
                 target_files.append(fr)
@@ -171,7 +187,7 @@ class ScanResultSummarizer:
             fp = result.path_in_project
             result.in_scope = True            
             # file
-            t_objs = obj_res[tt]["objects"]
+            t_objs = obj_res.get(tt, {}).get("objects", [])
             is_scanned = False
             for to in t_objs:
                 if to["filepath"] == fp:
@@ -184,12 +200,12 @@ class ScanResultSummarizer:
                         if fp == tasks["filepath"]:
                             result.scanned_task_count = result.scanned_task_count + 1
                 if result.scanned_task_count == 0 and result.name_count != 0:
-                    result.warning = "no task found in this file"
+                    result.warning = "name found, but no task found"
             else:
                 skip = False
                 if result.scanned_task_count == 0 and result.name_count == 0:
                     result.in_scope = False
-                    result.skip_reason = "no task included"
+                    result.skip_reason = SKIP_REASON.NO_TASK
                     skip = True
                 # todo: invalid taskfile/playbook
                 elif result.scanned_task_count == 0 and result.role:
@@ -197,7 +213,12 @@ class ScanResultSummarizer:
                     if not path_from_role.startswith("tasks") and not path_from_role.startswith("handlers") \
                         and not path_from_role.startswith("tests"): 
                             result.in_scope = False
-                            result.skip_reason = f"invalid {result.type}"
+                            if result.type == "taskfile":
+                                result.skip_reason = SKIP_REASON.INVALID_TASKFILE
+                            elif result.type == "playbook":
+                                result.skip_reason = SKIP_REASON.INVALID_PLAYBOOK
+                            else:
+                                result.skip_reason = f"invalid {result.type}"
                             skip = True
                 if not skip:
                     result.error = "unknown"
@@ -225,7 +246,7 @@ class ScanResultSummarizer:
         p_skip_msgs_count = dict(collections.Counter(p_skip_msgs))
         tf_skip_msgs_count = dict(collections.Counter(tf_skip_msgs))
         o_skip_msgs_count = dict(collections.Counter(o_skip_msgs))
-        warning_msgs = [res.warning for res in file_results]
+        warning_msgs = [res.warning for res in file_results if res.warning]
         warning_msgs_count = dict(collections.Counter(warning_msgs))
         
         # playbook
@@ -454,11 +475,13 @@ class ScanResultSummarizer:
         cells.append(sr.project_count)
         return cells, c_num, r_num
 
-    def _gen_role_task_table(self, sr: ScanReport):
-        header = ["roles", "tasks"]
+    def _gen_contents_summary_table(self, sr: ScanReport):
+        header = ["playbooks", "taskfiles", "roles", "tasks"]
         c_num = len(header)
         r_num = 2
         cells = header
+        cells.append(sr.file_count.playbooks.total)
+        cells.append(sr.file_count.taskfiles.total)
         cells.append(sr.role_count.total)
         cells.append(sr.task_count.total)
         return cells, c_num, r_num
@@ -495,24 +518,33 @@ class ScanResultSummarizer:
         mdFile.new_line(f"metadata_file: {metadata_file.replace(self.objects_root_dir, '')}")
         mdFile.new_line(f"object_file: {object_file.replace(self.objects_root_dir, '')}")
         mdFile.new_header(level=1, title='Detail reports')
-        mdFile.new_line("[Scan Result](#scan-result)")
-        mdFile.new_line("[Yaml file inventory](#yaml-file-inventory)")
-        mdFile.new_line("[File result](#file-result)")
+        mdFile.new_line("[Scan count](#scan-count)")
+        mdFile.new_line("[Scan count (per Type)](#scan-count-per-type)")
+        mdFile.new_line("[Scan count (per File)](#scan-count-per-file)")
 
-        mdFile.new_header(level=1, title='Scan Result')
-        header = ["file count", "task count", "role count"]
-        cells = header
-        cells.append(sr.file_count.total)
-        cells.append(sr.task_count.total)
-        cells.append(sr.role_count.total)
-        mdFile.new_table(columns=3, rows=2, text=cells, text_align='left')
+        # mdFile.new_header(level=1, title='Scan count')
+        # header = ["file count", "task count", "role count"]
+        # cells = header
+        # cells.append(sr.file_count.total)
+        # cells.append(sr.task_count.total)
+        # cells.append(sr.role_count.total)
+        # mdFile.new_table(columns=3, rows=2, text=cells, text_align='left')
+        mdFile.new_line('Scan count')
+        cells, c_num, r_num = self._gen_contents_summary_table(sr)
+        mdFile.new_table(columns=c_num, rows=r_num, text=cells, text_align='left')
 
-        mdFile.new_header(level=1, title='Yaml file inventory')
+        mdFile.new_header(level=1, title='Scan count (per Type)')
         cells, c_num, r_num = self._gen_inventory_table(sr)
         mdFile.new_table(columns=c_num, rows=r_num, text=cells, text_align='left')
 
-        mdFile.new_header(level=1, title='File Result')
-        header = ["file", "type", "status", "task count", "error", "skip_reason", "role"]
+        # link to description
+        desc_md_path = os.path.join(self.outdir, "REASON-DESCRIPTION.md")
+        relative_path = os.path.relpath(desc_md_path, detail_repo_dir)
+        mdFile.write(f'[skip reason]({relative_path})', align='right')
+
+
+        mdFile.new_header(level=1, title='Scan count (per File)')
+        header = ["file", "type", "status", "task count", "error", "skip_reason", "role", "warning"]
         cells = header
         for ty in file_results:
             status = "" # success or fail or skipped or others
@@ -530,7 +562,8 @@ class ScanResultSummarizer:
             cells.append(ty.error)
             cells.append(ty.skip_reason)
             cells.append(ty.role)
-        mdFile.new_table(columns=7, rows=len(file_results)+1, text=cells, text_align='left')
+            cells.append(ty.warning)
+        mdFile.new_table(columns=8, rows=len(file_results)+1, text=cells, text_align='left')
         mdFile.create_md_file()
         return
     
@@ -545,33 +578,39 @@ class ScanResultSummarizer:
         mdFile.new_line(f"[<< Top Report]({relative_path})")
 
         mdFile.new_line("")
-        mdFile.new_line("[Project Result](#project-result)")
-        mdFile.new_line("[Yaml inventory](#yaml-inventory)")
-        mdFile.new_line("[File result](#file-result)")
-        mdFile.new_line("[Role and Task](#role-and-task)")
-        mdFile.new_line("[Project List](#project-list)")
+        mdFile.new_line("[Scan Summary](#scan-summary)")
+        mdFile.new_line("[Scan Summary (per Type)](#scan-summary-per-type)")
+        mdFile.new_line("[Scan Summary (per Project)](#scan-summary-per-project)")
 
         # summary
         _data = load_json_data(json_path)
         sr = ScanReport.from_dict(_data[0])
+
         # project
-        mdFile.new_header(level=1, title='Project Result')
+        mdFile.new_header(level=1, title='Scan Summary')
+        mdFile.new_line('Project summary')
         cells, c_num, r_num = self._gen_project_result_table(sr)
         mdFile.new_table(columns=4, rows=2, text=cells, text_align='left')
 
+        # role and task
+        mdFile.new_line('Contents summary')
+        cells, c_num, r_num = self._gen_contents_summary_table(sr)
+        mdFile.new_table(columns=c_num, rows=r_num, text=cells, text_align='left')
+
         # ymls
-        mdFile.new_header(level=1, title='Yaml Inventory')
+        mdFile.new_header(level=1, title='Scan Summary (per Type)')
         cells, c_num, r_num = self._gen_inventory_table(sr)
         mdFile.new_table(columns=c_num, rows=r_num, text=cells, text_align='left')
 
-        # role and task
-        mdFile.new_header(level=1, title='Role and Task')
-        cells, c_num, r_num = self._gen_role_task_table(sr)
-        mdFile.new_table(columns=c_num, rows=r_num, text=cells, text_align='left')
+        # link to description
+        desc_md_path = os.path.join(self.outdir, "REASON-DESCRIPTION.md")
+        relative_path = os.path.relpath(desc_md_path, src_dir)
+        mdFile.write(f'[skip reason]({relative_path})', align='right')
+
 
         # repo list
-        mdFile.new_header(level=1, title='Project List')
-        header = ["project", "state", "files", "playbooks (passed/total)", "taskfiles (passed/total)", "others", "skipped", "errors", "roles", "tasks"]
+        mdFile.new_header(level=1, title='Scan Summary (per Project)')
+        header = ["project", "state", "files", "playbooks (passed/total)", "taskfiles (passed/total)", "others", "skipped", "errors", "roles", "tasks", "warning"]
         cells = header
         json_files = glob.glob(os.path.join(self.json_outdir, src_type, "**", "summary.json"), recursive=True)
         row_count = 0
@@ -604,7 +643,8 @@ class ScanResultSummarizer:
             cells.append(sr.file_count.errors.total+sr.file_count.playbooks.scan_error+sr.file_count.taskfiles.scan_error)
             cells.append(sr.role_count.total)
             cells.append(sr.task_count.total)
-        mdFile.new_table(columns=10, rows=row_count+1, text=cells, text_align='left')
+            cells.append(sum(sr.warning.values()))
+        mdFile.new_table(columns=11, rows=row_count+1, text=cells, text_align='left')
         mdFile.create_md_file()
         return
 
@@ -616,20 +656,27 @@ class ScanResultSummarizer:
         _data = load_json_data(json_path)
         sr = ScanReport.from_dict(_data[0])
 
-        # mdFile.new_header(level=1, title='Project Result')
-        # cells, c_num, r_num = self._gen_project_result_table(sr)
-        # mdFile.new_table(columns=4, rows=2, text=cells, text_align='left')
+        mdFile.new_header(level=1, title='Scan Summary')
+        mdFile.new_line('Project summary')
+        cells, c_num, r_num = self._gen_project_result_table(sr)
+        mdFile.new_table(columns=4, rows=2, text=cells, text_align='left')
 
-        mdFile.new_header(level=1, title='Yaml Inventory')
+        mdFile.new_line('Contents summary')
+        cells, c_num, r_num = self._gen_contents_summary_table(sr)
+        mdFile.new_table(columns=c_num, rows=r_num, text=cells, text_align='left')
+
+
+        mdFile.new_header(level=1, title='Scan Summary (per Type)')
         cells, c_num, r_num = self._gen_inventory_table(sr)
         mdFile.new_table(columns=c_num, rows=r_num, text=cells, text_align='left')
 
-        mdFile.new_header(level=1, title='Role and Task')
-        cells, c_num, r_num = self._gen_role_task_table(sr)
-        mdFile.new_table(columns=c_num, rows=r_num, text=cells, text_align='left')
+        # link to description
+        desc_md_path = os.path.join(self.outdir, "REASON-DESCRIPTION.md")
+        relative_path = os.path.relpath(desc_md_path, self.outdir)
+        mdFile.write(f'[skip reason]({relative_path})', align='right')
 
         # src type result
-        mdFile.new_header(level=1, title='Src Type List')
+        mdFile.new_header(level=1, title='Scan summary (per Src type)')
         header = ["src type", "state", "projects", "files", "playbooks (passed/total)", "taskfiles (passed/total)", "others", "skipped", "errors", "roles", "tasks"]
         cells = header
 
@@ -665,7 +712,22 @@ class ScanResultSummarizer:
         mdFile.new_table(columns=11, rows=row_count+1, text=cells, text_align='left')
         mdFile.create_md_file()
         return
+    
 
+    def generate_reason_description(self):
+        md_path = os.path.join(self.outdir, "REASON-DESCRIPTION.md")
+        mdFile = MdUtils(file_name=md_path, title=f'Skip reason description')
+        items = []
+        items.append(f"{SKIP_REASON.NO_TASK}:  {SKIP_REASON.NO_TASK_desc}")
+        items.append(f"{SKIP_REASON.INVALID_TASKFILE}:  {SKIP_REASON.INVALID_desc}")
+        items.append(f"{SKIP_REASON.INVALID_PLAYBOOK}:  {SKIP_REASON.INVALID_desc}")
+        items.append(f"{SKIP_REASON.EXT_DEP}:  {SKIP_REASON.EXT_DEP_desc}")
+        items.append(f"{SKIP_REASON.OTHERS}:  {SKIP_REASON.OTHERS_desc}")
+        items.append(f"{SKIP_REASON.MANY_TASKS}:  {SKIP_REASON.MANY_TASKS_desc}")
+        items.append(f"{SKIP_REASON.YAMLParseError}:  {SKIP_REASON.YAMLParseError_desc}")
+        mdFile.new_list(items)
+        mdFile.create_md_file()
+        return
 
 def export_result(filepath, results):
     with open(filepath, "w") as file:
@@ -767,3 +829,4 @@ if __name__ == '__main__':
         file.write(all_summary.to_json(ensure_ascii=False))
     # top md file
     summarizer.generate_top_report(os.path.join(json_outdir, "summary.json"))
+    summarizer.generate_reason_description()

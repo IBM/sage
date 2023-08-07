@@ -404,7 +404,7 @@ class SagePipeline(object):
         # make a list of missing files from the first scan
         missing_files = []
         for project_name in self.scan_records["project_file_list"]:
-            base_dir = self.scan_records["project_file_list"][project_name]["path"]
+            base_dir = os.path.abspath(self.scan_records["project_file_list"][project_name]["path"])
             for file in self.scan_records["project_file_list"][project_name]["files"]:
                 label = file.get("label", "")
                 filepath = file.get("filepath", "")
@@ -419,7 +419,7 @@ class SagePipeline(object):
                     missing_files.append((_type, _name, filepath, base_dir, "project"))
 
         for role_name in self.scan_records["role_file_list"]:
-            base_dir = self.scan_records["role_file_list"][role_name]["path"]
+            base_dir = os.path.abspath(self.scan_records["role_file_list"][role_name]["path"])
             for file in self.scan_records["role_file_list"][role_name]["files"]:
                 label = file.get("label", "")
                 filepath = file.get("filepath", "")

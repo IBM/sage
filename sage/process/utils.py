@@ -74,6 +74,29 @@ def get_task_sequence(
     return []
 
 
+def get_playbook_vars(playbook: Playbook, project: SageProject):
+    vars = {}
+    plays = get_plays(playbook, project)
+    for play in plays:
+        if not isinstance(play, Play):
+            continue
+        p_vars = play.variables
+        vars.update(p_vars)
+    return vars
+
+
+def get_plays(playbook: Playbook, project: SageProject):
+    play_keys = playbook.plays
+    plays = []
+    for p_key in play_keys:
+        play = project.get_object(key=p_key)
+        if not play:
+            continue
+        if not isinstance(play, Play):
+            continue
+        plays.append(play)
+    return plays
+
 def get_annotation(obj: SageObject, name: str):
     for anno in obj.annotations:
         print(anno)

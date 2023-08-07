@@ -197,6 +197,7 @@ class SagePipeline(object):
         return
 
     def _target_dir_to_input(self, target_dir):
+        dir_size = get_dir_size(target_dir)
         path_list = get_yml_list(target_dir)
         project_file_list, role_file_list, independent_file_list = create_scan_list(path_list)
         # used for detecting missing files at the 1st scan
@@ -206,6 +207,8 @@ class SagePipeline(object):
         self.scan_records["non_task_scanned_files"] = []
         self.scan_records["findings"] = []
         self.scan_records["metadata"] = {}
+        self.scan_records["time"] = []
+        self.scan_records["size"] = dir_size
         self.scan_records["objects"] = []
 
         num = len(project_file_list) + len(role_file_list) + len(independent_file_list)
@@ -459,6 +462,8 @@ class SagePipeline(object):
             "non_task_scanned_files": [],
             "findings": [],
             "metadata": {},
+            "time": [],
+            "size": 0,
             "objects": [],
         }
         self.yml_inventory = []
@@ -503,6 +508,7 @@ class SagePipeline(object):
 
         result = None
         scandata = None
+        elapsed = None
         try:
             include_tests = self.ari_include_tests
             out_dir = ""
@@ -511,6 +517,7 @@ class SagePipeline(object):
             objects = False
             if self.ari_objects and out_dir:
                 objects = True
+            begin = time.time()
             result = self.scanner.evaluate(
                 type=_type,
                 name=path,
@@ -524,6 +531,7 @@ class SagePipeline(object):
                 playbook_only=playbook_only,
                 base_dir=base_dir,
             )
+            elapsed = time.time() - begin
             scandata = self.scanner.get_last_scandata()
         except Exception:
             error = traceback.format_exc()
@@ -595,6 +603,8 @@ class SagePipeline(object):
                     if source:
                         sage_obj.set_source(source)
                     self.scan_records["objects"].append(sage_obj)
+
+            self.scan_records["time"].append({"target_type": _type, "target_name": name, "scan_seconds": elapsed})
 
             if _type == "project":
                 metadata = findings.metadata.copy()
@@ -695,12 +705,16 @@ class SagePipeline(object):
         yml_inventory = self.yml_inventory
         objects = self.scan_records.get("objects", [])
         metadata = self.scan_records.get("metadata", {})
+        scan_time = self.scan_records.get("time", [])
+        dir_size = self.scan_records.get("size", 0)
 
         proj = SageProject.from_source_objects(
             source=source,
             yml_inventory=yml_inventory,
             objects=objects,
             metadata=metadata,
+            scan_time=scan_time,
+            dir_size=dir_size,
         )
         proj_metadata = proj.metadata()
         
@@ -866,3 +880,14 @@ def create_scan_list(yml_inventory):
                 "error": error,
             })
     return project_file_list, role_file_list, independent_file_list
+
+
+def get_dir_size(path=""):
+    total = 0
+    with os.scandir(path) as it:
+        for entry in it:
+            if entry.is_file(follow_symlinks=False):
+                total += entry.stat().st_size
+            elif entry.is_dir(follow_symlinks=False):
+                total += get_dir_size(entry.path)
+    return total

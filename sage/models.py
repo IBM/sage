@@ -301,10 +301,12 @@ class SageProject(object):
 
     path: str = ""
     scan_timestamp: str = ""
+    scan_time_detail: list = field(default_factory=list)
+    dir_size: int = 0
     pipeline_version: str = ""
 
     @classmethod
-    def from_source_objects(cls, source: dict, yml_inventory: list, objects: list, metadata: dict):
+    def from_source_objects(cls, source: dict, yml_inventory: list, objects: list, metadata: dict, scan_time: list, dir_size: int):
         proj = cls()
         proj.source = source
         if source:
@@ -318,6 +320,8 @@ class SageProject(object):
         proj.path = metadata.get("name", "")
         proj.scan_timestamp = metadata.get("scan_timestamp", "")
         proj.pipeline_version = metadata.get("pipeline_version", "")
+        proj.scan_time_detail = scan_time
+        proj.dir_size = dir_size
         return proj
     
     def add_object(self, obj: SageObject):
@@ -424,6 +428,8 @@ class SageProject(object):
             "objects": objects,
             "path": self.path,
             "scan_timestamp": self.scan_timestamp,
+            "scan_time_detail": self.scan_time_detail,
+            "dir_size": self.dir_size,
             "pipeline_version": self.pipeline_version,
             "yml_files": self.yml_files,
         }

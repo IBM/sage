@@ -540,7 +540,7 @@ class ScanResultSummarizer:
         # link to description
         desc_md_path = os.path.join(self.outdir, "REASON-DESCRIPTION.md")
         relative_path = os.path.relpath(desc_md_path, detail_repo_dir)
-        mdFile.write(f'[skip reason]({relative_path})', align='right')
+        mdFile.new_paragraph(f'[skip reason]({relative_path})')
 
 
         mdFile.new_header(level=1, title='Scan count (per File)')
@@ -605,7 +605,7 @@ class ScanResultSummarizer:
         # link to description
         desc_md_path = os.path.join(self.outdir, "REASON-DESCRIPTION.md")
         relative_path = os.path.relpath(desc_md_path, src_dir)
-        mdFile.write(f'[skip reason]({relative_path})', align='right')
+        mdFile.new_paragraph(f'[skip reason]({relative_path})')
 
 
         # repo list
@@ -673,7 +673,7 @@ class ScanResultSummarizer:
         # link to description
         desc_md_path = os.path.join(self.outdir, "REASON-DESCRIPTION.md")
         relative_path = os.path.relpath(desc_md_path, self.outdir)
-        mdFile.write(f'[skip reason]({relative_path})', align='right')
+        mdFile.new_paragraph(f'[skip reason]({relative_path})')
 
         # src type result
         mdFile.new_header(level=1, title='Scan summary (per Src type)')

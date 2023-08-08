@@ -11,6 +11,11 @@ def prepare_source_dir(root_dir, yaml_file):
     if not os.path.exists(root_dir):
         os.makedirs(root_dir)
 
+    ignore_list = [
+        "m4rkw/minotaur-install",
+        "rodo/ansible-tsung",
+    ]
+    
     yaml_file_contents = load_json_data(yaml_file)
     for content in yaml_file_contents:
         if "namespace_name" in content:
@@ -20,8 +25,12 @@ def prepare_source_dir(root_dir, yaml_file):
 
         if type == "project":
             repo_name = content.get("repo_name")
+            if repo_name in ignore_list:
+                continue
             path = content.get("path")
-            text = content.get("content")
+            text = content.get("text")
+            if not text:
+                text = content.get("content")
             license = content.get("license")
             target_dir = os.path.join(root_dir, repo_name)
             if not os.path.exists(target_dir):
@@ -99,8 +108,9 @@ if __name__ == '__main__':
     parser.add_argument("-f", "--file", help='source yaml file')
     parser.add_argument("-t", "--type", help='type of data source')
     parser.add_argument("-d", "--dir", help='tmp dir to recreate source dir')
-    parser.add_argument("-o", "--out-file", help="output directory for the rule evaluation result")
+    parser.add_argument("-o", "--out-file", help="output directory for ")
     args = parser.parse_args()
 
-    path_list = prepare_source_dir(args.dir, args.type, args.file)
+    target_dir = f"{args.dir}/{args.type}"
+    path_list = prepare_source_dir(target_dir, args.file)
     write_result(args.out_file, path_list)

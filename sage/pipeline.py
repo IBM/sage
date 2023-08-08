@@ -341,6 +341,17 @@ class SagePipeline(object):
         if isinstance(kwargs, dict) and "scan_func" in kwargs:
             scan_func = kwargs["scan_func"]
             scan_func(input_list)
+
+        yml_inventory_only = False
+        if isinstance(kwargs, dict) and "yml_inventory_only" in kwargs:
+            yml_inventory_only = kwargs["yml_inventory_only"]
+        if yml_inventory_only:
+            self.yml_inventory = self.create_yml_inventory()
+            if output_dir and self.do_save_yml_inventory:
+                yml_inventory_path = os.path.join(output_dir, "yml_inventory.json")
+                self.save_yml_inventory(yml_inventory_path)
+            return
+
         elif self.do_multi_stage:
             self._multi_stage_scan(input_list)
         else:

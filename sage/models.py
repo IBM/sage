@@ -16,7 +16,7 @@ from ansible_risk_insight.models import (
     BecomeInfo,
 )
 from ansible_risk_insight.findings import Findings as ARIFindings
-from ansible_risk_insight.keyutil import get_obj_type
+from ansible_risk_insight.keyutil import get_obj_type, key_delimiter
 
 
 logger = logging.getLogger(__name__)
@@ -339,21 +339,40 @@ class SageProject(object):
                 if obj.key == key:
                     return obj
         return None
+
+    def get_all_call_sequences(self):
+        found_taskfile_keys = set()
+        all_call_sequences = []
+        for p in self.playbooks:
+            call_graph = self._get_call_graph(obj=p)
+            all_call_sequences.append(call_graph)
+            tmp_taskfile_keys = set([obj.key for obj in call_graph if isinstance(obj, TaskFile)])
+            found_taskfile_keys = found_taskfile_keys.union(tmp_taskfile_keys)
+        for r in self.roles:
+            call_graph = self._get_call_graph(obj=r)
+            all_call_sequences.append(call_graph)
+            tmp_taskfile_keys = set([obj.key for obj in call_graph if isinstance(obj, TaskFile)])
+            found_taskfile_keys = found_taskfile_keys.union(tmp_taskfile_keys)
+        for tf in self.taskfiles:
+            if tf.key in found_taskfile_keys:
+                continue
+            call_graph = self._get_call_graph(obj=tf)
+            all_call_sequences.append(call_graph)
+        return all_call_sequences
     
     # NOTE: currently this returns only 1 sequence found first
-    def get_call_sequence(self, target: Task):
-        target_key = target.key
-        found = None
-        for p in self.playbooks():
-            call_graph = self._get_call_graph(obj=p)
-            all_keys = [obj.key for obj in call_graph]
-            if target_key in all_keys:
-                found = call_graph
+    def get_call_sequence_for_task(self, task: Task):
+        target_key = task.key
+        all_call_seqs = self.get_all_call_sequences()
+        found_seq = None
+        for call_seq in all_call_seqs:
+            keys_in_seq = [obj.key for obj in call_seq]
+            if target_key in keys_in_seq:
+                found_seq = call_seq
                 break
-        if found:
-            return found
-        return None
+        return found_seq
 
+    # get call sequence which starts from the specified object (e.g. playbook -> play -> task)
     def _get_call_graph(self, obj: SageObject=None, key: str=""):
         if not obj and not key:
             raise ValueError("either `obj` or `key` must be non-empty value")
@@ -370,7 +389,15 @@ class SageProject(object):
         if isinstance(obj, Playbook):
             return obj.plays
         elif isinstance(obj, Role):
-            return obj.taskfiles
+            # TODO: support role invokation for non main.yml
+            target_filenames = ["main.yml", "main.yaml"]
+            def get_filename(tf_key):
+                return tf_key.split(key_delimiter)[-1].split("/")[-1]
+            taskfile_key = [
+                tf_key
+                for tf_key in obj.taskfiles if get_filename(tf_key) in target_filenames
+            ]
+            return taskfile_key
         elif isinstance(obj, Play):
             roles = []
             if obj.roles_info:

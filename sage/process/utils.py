@@ -1,7 +1,9 @@
 from sage.models import SageObject, SageProject, Playbook, TaskFile, Play, Task
+from sage.process.variable_resolver import VariableResolver
 from ansible_risk_insight.models import Annotation
 
 
+# find all tasks defined in the specified playbook from SageProject
 def get_tasks_in_playbook(playbook: Playbook, project: SageProject=None):
     play_keys = playbook.plays
     tasks = []
@@ -14,6 +16,7 @@ def get_tasks_in_playbook(playbook: Playbook, project: SageProject=None):
     return tasks
 
 
+# find all tasks defined in the specified play from SageProject
 def get_tasks_in_play(play: Play, project: SageProject=None):
     task_keys = play.pre_tasks + play.tasks + play.post_tasks
     tasks = []
@@ -25,6 +28,7 @@ def get_tasks_in_play(play: Play, project: SageProject=None):
     return tasks
 
 
+# find all tasks defined in the specified taskfile from SageProject
 def get_tasks_in_taskfile(taskfile: TaskFile, project: SageProject=None):
     task_keys = taskfile.tasks
     tasks = []
@@ -36,7 +40,8 @@ def get_tasks_in_taskfile(taskfile: TaskFile, project: SageProject=None):
     return tasks
 
 
-def get_tasks_in_file(target: SageObject=None, project: SageProject=None):
+# find all tasks defined in the specified playbook or taskfile from SageProject
+def get_tasks_in_file(target: Playbook|TaskFile=None, project: SageProject=None):
     tasks = []
     if isinstance(target, Playbook):
         tasks = get_tasks_in_playbook(target, project)
@@ -45,6 +50,8 @@ def get_tasks_in_file(target: SageObject=None, project: SageProject=None):
     return tasks
 
 
+# find all tasks defined in the specified playbook or taskfile from SageProject
+# if `root` is an object key, get the object from SageProject first
 def get_tasks(root: str | SageObject, project: SageProject=None):
     root_obj = root
     if isinstance(root, str):
@@ -52,39 +59,7 @@ def get_tasks(root: str | SageObject, project: SageProject=None):
     return get_tasks_in_file(target=root_obj, project=project)
 
 
-def get_call_sequence(target: Task=None, project: SageProject=None):
-    return project.get_call_sequence(target)
-
-
-def get_task_sequence(
-    playbook: Playbook=None,
-    taskfile: TaskFile=None,
-    project: SageProject=None,
-    ):
-    if not playbook and not taskfile:
-        raise ValueError("either `playbook` or `taskfile` must be specifed")
-    
-    if not project:
-        raise ValueError("`project` must be specified")
-    
-    if playbook:
-        return get_tasks_in_playbook(playbook, project)
-    elif taskfile:
-        return get_tasks_in_taskfile(taskfile, project)
-    return []
-
-
-def get_playbook_vars(playbook: Playbook, project: SageProject):
-    vars = {}
-    plays = get_plays(playbook, project)
-    for play in plays:
-        if not isinstance(play, Play):
-            continue
-        p_vars = play.variables
-        vars.update(p_vars)
-    return vars
-
-
+# find all plays defined in the specified playbook from SageProject
 def get_plays(playbook: Playbook, project: SageProject):
     play_keys = playbook.plays
     plays = []
@@ -97,7 +72,22 @@ def get_plays(playbook: Playbook, project: SageProject):
         plays.append(play)
     return plays
 
-def get_annotation(obj: SageObject, name: str):
-    for anno in obj.annotations:
-        print(anno)
-    return None
+
+# get all call sequences found in the SageProject
+# call sequence is a sequence of objects executed by an entrypoint
+# e.g.) Playbook --> Play 1 -> Task 1a -> Task 1b -> Play 2 -> Task 2a 
+def get_all_call_sequences(project: SageProject):
+    return project.get_all_call_sequences()
+
+
+# get a call sequence which contains the specified task
+def get_call_sequence_for_task(task: Task, project: SageProject):
+    return project.get_call_sequence_for_task(task)
+
+
+# embed `defined_vars` annotation to all objects in a call sequence
+def set_defined_vars(call_seq: list):
+    resolver = VariableResolver(call_seq=call_seq)
+    resolver.set_defined_vars()
+    call_seq = resolver.call_seq
+    return

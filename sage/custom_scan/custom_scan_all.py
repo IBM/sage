@@ -72,7 +72,6 @@ if __name__ == "__main__":
 
     dp = SagePipeline(
         ari_kb_data_dir=ARI_KB_DATA_DIR,
-        ari_rules_dir=os.path.join(os.path.dirname(__file__), "rules"),
     )
 
     timer_path = "/tmp/custom-scan-all-timer.json"

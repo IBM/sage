@@ -15,7 +15,6 @@ if not os.path.exists(ARI_KB_DATA_DIR):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="TODO")
     parser.add_argument("-d", "--dir", help='root direcotry for scan')
-    parser.add_argument("--rule", default="PP006", help="rule id (default to \"PP006\")")
     parser.add_argument("-t", "--source-type", help='source type (e.g."GitHub-RHIBM")')
     parser.add_argument("-r", "--repo-name", help='repo name (e.g."IBM/Ansible-OpsnShift-Provisioning")')
     parser.add_argument("-o", "--out-dir", default="", help="output directory for the rule evaluation result")
@@ -29,7 +28,6 @@ if __name__ == '__main__':
 
     dp = SagePipeline(
         ari_kb_data_dir=ARI_KB_DATA_DIR,
-        ari_rules_dir=os.path.join(os.path.dirname(__file__), "rules"),
     )
     os.environ['SAGE_CONTENT_ANALYSIS_OUT_DIR'] = args.out_dir
     result = dp.run(

@@ -57,6 +57,7 @@ yaml.representer.SafeRepresenter.add_representer(None, default_representer)
 
 thread_id = threading.get_native_id()
 in_parallel = strtobool(os.getenv("SAGE_CONTENT_ANALYSIS_PARALLEL", "False"))
+do_save_scan_result = strtobool(os.getenv("SAGE_SAVE_SCAN_RESULT", "False"))
 out_dir = os.getenv("SAGE_CONTENT_ANALYSIS_OUT_DIR", "/tmp/ftdata")
 file_suffix = f"_{thread_id}" if in_parallel else ""
 default_task_context_data_filepath = os.path.join(out_dir, f"task_context_data{file_suffix}.json")
@@ -627,17 +628,18 @@ class PreProcessingRule(Rule):
         self.data_buffer_ftdata = []
 
         # scan result
-        filepath = self.scan_result_save_filepath
+        if do_save_scan_result:
+            filepath = self.scan_result_save_filepath
 
-        dirpath = os.path.dirname(filepath)
-        if not os.path.exists(dirpath):
-            os.makedirs(name=dirpath, mode=0o777, exist_ok=True)
+            dirpath = os.path.dirname(filepath)
+            if not os.path.exists(dirpath):
+                os.makedirs(name=dirpath, mode=0o777, exist_ok=True)
 
-        with open(filepath, "a+") as file:
-            for line in self.data_buffer_scan_result:
-                file.write(line + "\n")
+            with open(filepath, "a+") as file:
+                for line in self.data_buffer_scan_result:
+                    file.write(line + "\n")
 
-        self.data_buffer_scan_result = []
+            self.data_buffer_scan_result = []
         return
 
     def match(self, ctx: AnsibleRunContext) -> bool:

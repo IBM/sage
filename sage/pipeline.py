@@ -120,11 +120,11 @@ class SagePipeline(object):
     do_parallel: bool = False
 
     do_save_yml_inventory: bool = True
-    do_save_unique_tasks: bool = True
-    do_save_findings: bool = True
+    do_save_findings: bool = False
     do_save_metadata: bool = True
     do_save_objects: bool = True
     do_save_result: bool = False
+    do_save_output: bool = False
 
     aggregation_rule_id: str = ""
 
@@ -382,7 +382,7 @@ class SagePipeline(object):
         output_list = self.to_output(**kwargs)
         self.ftdata = [od.data for od in output_list if isinstance(od, OutputData)]
 
-        if output_dir:
+        if output_dir and self.do_save_output:
             output_path = os.path.join(output_dir, "ftdata.json")
             self.save(output_list, output_path)
 

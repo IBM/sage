@@ -1,7 +1,6 @@
 import json
 import jsonpickle
 import threading
-import distutils
 from datetime import date, time
 from dataclasses import dataclass, field
 import ruamel.yaml
@@ -35,6 +34,21 @@ except Exception:
     # otherwise, use Python based loader
     from yaml import SafeDumper as Dumper
 
+# Copied from distutils.util.strtobool
+def strtobool(val):
+    """Convert a string representation of truth to true (1) or false (0).
+    True values are 'y', 'yes', 't', 'true', 'on', and '1'; false values
+    are 'n', 'no', 'f', 'false', 'off', and '0'.  Raises ValueError if
+    'val' is anything else.
+    """
+    val = val.lower()
+    if val in ('y', 'yes', 't', 'true', 'on', '1'):
+        return 1
+    elif val in ('n', 'no', 'f', 'false', 'off', '0'):
+        return 0
+    else:
+        raise ValueError("invalid truth value %r" % (val,))
+
 # Set default representer
 def default_representer(dumper, data):
     return dumper.represent_scalar('tag:yaml.org,2002:str', serialize(data))
@@ -42,7 +56,7 @@ yaml.representer.SafeRepresenter.add_representer(None, default_representer)
 
 
 thread_id = threading.get_native_id()
-in_parallel = distutils.util.strtobool(os.getenv("SAGE_CONTENT_ANALYSIS_PARALLEL", "False"))
+in_parallel = strtobool(os.getenv("SAGE_CONTENT_ANALYSIS_PARALLEL", "False"))
 out_dir = os.getenv("SAGE_CONTENT_ANALYSIS_OUT_DIR", "/tmp/ftdata")
 file_suffix = f"_{thread_id}" if in_parallel else ""
 default_task_context_data_filepath = os.path.join(out_dir, f"task_context_data{file_suffix}.json")
@@ -80,7 +94,7 @@ def find_repo_info(ctx: AnsibleRunContext):
         input_type = input.get("type")
         if scan_type != input_type:
             continue
-        
+
         input_path = ""
         if scan_type == "role":
             input_path = input.get("role_path")
@@ -142,7 +156,7 @@ def get_used_modules(ctx, task):
         # if node is the target task, exit loop
         if node.spec.key == task.spec.key:
             break
-        
+
         module = get_module_name(node)
          # if the module is empty, skip it
         if not module:
@@ -179,7 +193,7 @@ def get_name_sequence(ctx, task):
         elif node.depth == task_node_depth:
             if get_parent_node_id(node.node_id) == task_parent_node_id:
                 skip = False
-        
+
         if skip:
             continue
 
@@ -200,7 +214,7 @@ def get_name_sequence(ctx, task):
     # we truncate older context if the name sequence is too large
     if len(name_seq) > max_context_node_size:
         name_seq = name_seq[-max_context_node_size:]
-    
+
     return name_seq
 
 def get_parents(ctx, task):
@@ -227,7 +241,7 @@ def get_parents(ctx, task):
         elif node.depth == task_node_depth:
             if get_parent_node_id(node.node_id) == task_parent_node_id:
                 skip = False
-        
+
         if skip:
             continue
 
@@ -260,7 +274,7 @@ def get_used_vars(ctx, task):
     # if there is no task before the target, return no vars
     if not previous_task:
         return [], False
-    
+
     used_var_names = list(previous_task.variable_use.keys())
     omitted = False
     used_var_names_str = json.dumps(used_var_names)
@@ -391,10 +405,10 @@ def get_metrics(ctx, task, module, used_modules, used_vars, defined_vars, coll_d
         "num_of_vars_covered_by_context": 0,
     }
     d["module_name"] = module
-    
+
     if "." not in module:
         return d
-    
+
     parts = module.split(".")
     module_parent = ""
     if len(parts) == 2:
@@ -402,10 +416,10 @@ def get_metrics(ctx, task, module, used_modules, used_vars, defined_vars, coll_d
     elif len(parts) >= 3:
         module_parent = ".".join(parts[:2])
     d["module_parent"] = module_parent
-    
+
     if module_parent == "ansible.builtin":
         return d
-    
+
     exact_match = [um for um in used_modules if um == module]
     parent_match = [um for um in used_modules if um.startswith(f"{module_parent}.")]
     d["exact_match_in_used_modules"] = len(exact_match)
@@ -429,7 +443,7 @@ def get_metrics(ctx, task, module, used_modules, used_vars, defined_vars, coll_d
 
     if num_of_vars_used_in_this_task == 0:
         return d
-    
+
     found_used_var_count = 0
     found_defined_var_count = 0
     covered_var_count = 0
@@ -438,14 +452,14 @@ def get_metrics(ctx, task, module, used_modules, used_vars, defined_vars, coll_d
         if var_name in used_vars:
             found_used_var_count += 1
             covered = True
-        
+
         if var_name in defined_vars:
             found_defined_var_count += 1
             covered = True
 
         if covered:
             covered_var_count += 1
-        
+
     d["num_of_vars_found_in_used_vars"] = found_used_var_count
     d["num_of_vars_found_in_defined_vars"] = found_defined_var_count
     d["num_of_vars_covered_by_context"] = covered_var_count
@@ -456,7 +470,7 @@ def get_file_type(yaml_before_task):
         file_type = "taskfile"
         context_data = []
         return file_type, context_data
-    
+
     file_type = ""
     try:
         context_data = yaml.safe_load(yaml_before_task)
@@ -490,7 +504,7 @@ def make_task_format_context(file_type, context_data, defined_vars, parents):
             task["ansible.builtin.set_fact"] = make_context_vars_dict(defined_vars)
             context_tasks.append(task)
             updated = True
-        
+
         import_context_tasks = make_import_context(parents)
         if len(import_context_tasks) != 0:
             updated = True
@@ -589,7 +603,7 @@ class PreProcessingRule(Rule):
     data_buffer_ftdata: list = field(default_factory=list)
     data_buffer_scan_result: list = field(default_factory=list)
     buffer_size: int = 1000
-    
+
     def __post_init__(self):
 
         if os.path.exists(self.task_context_data_save_filepath):
@@ -597,7 +611,7 @@ class PreProcessingRule(Rule):
 
         if os.path.exists(self.scan_result_save_filepath):
             os.remove(self.scan_result_save_filepath)
-    
+
     def save_data(self):
         # ftdata
         filepath = self.task_context_data_save_filepath
@@ -605,11 +619,11 @@ class PreProcessingRule(Rule):
         dirpath = os.path.dirname(filepath)
         if not os.path.exists(dirpath):
             os.makedirs(name=dirpath, mode=0o777, exist_ok=True)
-        
+
         with open(filepath, "a+") as file:
             for line in self.data_buffer_ftdata:
                 file.write(line + "\n")
-        
+
         self.data_buffer_ftdata = []
 
         # scan result
@@ -618,14 +632,14 @@ class PreProcessingRule(Rule):
         dirpath = os.path.dirname(filepath)
         if not os.path.exists(dirpath):
             os.makedirs(name=dirpath, mode=0o777, exist_ok=True)
-        
+
         with open(filepath, "a+") as file:
             for line in self.data_buffer_scan_result:
                 file.write(line + "\n")
 
         self.data_buffer_scan_result = []
         return
-    
+
     def match(self, ctx: AnsibleRunContext) -> bool:
         return ctx.current.type == RunTargetType.Task
 
@@ -643,7 +657,7 @@ class PreProcessingRule(Rule):
                 context_parent = ctx.parent.name
             elif isinstance(ctx.parent, Role):
                 context_parent = ctx.parent.fqcn
-            elif isinstance(ctx.parent, Repository): 
+            elif isinstance(ctx.parent, Repository):
                 context_parent = ctx.parent.name
             if context_parent != parent_of_task:
                 return RuleResult(verdict=verdict, detail=detail, file=task.file_info(), rule=self.get_metadata())
@@ -722,7 +736,7 @@ class PreProcessingRule(Rule):
         train["ari_task_key"] = task.spec.key
         train["scan_type"] = scan_type
         train["scan_path"] = scan_path
-        
+
         prompt = ""
         yamllines = getattr(task.spec, "yaml_lines", "").split("\n")
         for yl in yamllines:
@@ -765,7 +779,7 @@ class PreProcessingRule(Rule):
         is_last_node_for_this_tree = False
         if ctx.is_last_task(task):
             is_last_node_for_this_tree = True
-        
+
         self.data_buffer_ftdata.append(json.dumps(detail, default=serialize))
         self.data_buffer_scan_result.append(jsonpickle.encode(task_spec, make_refs=False, unpicklable=False))
         if len(self.data_buffer_ftdata) >= self.buffer_size or is_last_node_for_this_tree:
@@ -783,7 +797,7 @@ def serialize(obj):
     if isinstance(obj, time):
         serial = obj.isoformat()
         return serial
-    
+
     if isinstance(obj, bytes):
         return str(obj)
 

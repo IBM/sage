@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from sage.models import Playbook, Play, TaskFile, Role, Task
+from sage.models import Playbook, Play, TaskFile, Role, Task, SageObject
 from ansible_risk_insight.models import VariableType
 
 
@@ -7,7 +7,14 @@ from ansible_risk_insight.models import VariableType
 class VariableResolver(object):
     call_seq: list = field(default_factory=list)
 
-    def set_defined_vars(self):
+    def get_defined_vars(self, object: SageObject):
+        obj_and_vars_list = self.set_defined_vars()
+        for obj, defnied_vars in obj_and_vars_list:
+            if obj.key == object.key:
+                return defnied_vars
+        return None
+
+    def set_defined_vars(self, set_annotation=False):
         def _update(defined_dict, variables, precedence):
             if not variables:
                 return
@@ -23,6 +30,7 @@ class VariableResolver(object):
             return
         
         defined_vars = {}
+        obj_and_vars_list = []
         for obj in self.call_seq:
             if isinstance(obj, Playbook):
                 _update(defined_vars, obj.variables, VariableType.PlaybookGroupVarsAll)
@@ -38,10 +46,14 @@ class VariableResolver(object):
                 _update(defined_vars, obj.variables, VariableType.TaskVars)
                 _update(defined_vars, obj.set_facts, VariableType.SetFacts)
 
-            # save a copy of defined_vars because it is updated by the next object in the sequence
+            # make a copy of defined_vars because it is updated by the next object in the sequence
             # and we remove precedence info here
-            obj.annotations["defined_vars"] = {k: v[0] for k, v in defined_vars.items()}
-        return
+            defined_vars_key_value = {k: v[0] for k, v in defined_vars.items()}
+            obj_and_vars_list.append((obj, defined_vars_key_value))
+
+            if set_annotation:
+                obj.annotations["defined_vars"] = defined_vars_key_value
+        return obj_and_vars_list
 
     def resolve(self):
         pass

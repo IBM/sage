@@ -371,6 +371,9 @@ class SageProject(object):
                 found_seq = call_seq
                 break
         return found_seq
+    
+    def get_call_sequence_by_entrypoint(self, entrypoint: Playbook|Role|TaskFile):
+        return self._get_call_graph(obj=entrypoint)
 
     # get call sequence which starts from the specified object (e.g. playbook -> play -> task)
     def _get_call_graph(self, obj: SageObject=None, key: str=""):

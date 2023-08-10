@@ -24,7 +24,7 @@
     - `OUTPUT_DIR` ... Path to the output directory. This will be created if it does not exist.
 
     ```
-    $ python patterns/custom_scan/custom_scan.py -d <PATH/TO/PROJECT> -o <OUTPUT_DIR>
+    $ python sage/custom_scan/custom_scan.py -d <PATH/TO/PROJECT> -o <OUTPUT_DIR>
     ```
 
 4. Confirm the output files

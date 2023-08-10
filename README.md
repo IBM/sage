@@ -117,10 +117,6 @@ Run the following command after `git clone`.
 $ pip install -e .
 ```
 
-## Usage patterns
-
-You can find some exmaples of usage in [patterns](./patterns/).
-
 ### Single repository scan
 
 ![custom-repo-scan](doc/images/custom-repo-scan.png)
@@ -140,7 +136,7 @@ export ARI_KB_DATA_DIR=/Users/mue/Downloads/ram-all-20230613/
 
 3. do custom scan for the repository
 ```
-python patterns/custom_scan/custom_scan.py \
+python sage/custom_scan/custom_scan.py \
   -d /tmp/Ansible-OpenShift-Provisioning \
   -o /tmp/test/sage_dir
 ```
@@ -149,31 +145,26 @@ output is below
 ```
 /tmp/test
 └── sage_dir
-    ├── ftdata.json  # ftdata
-    ├── scan_result.json  # object data scanned by ARI
+    ├── sage-metadata.json # metadata from scanning the repository
+    ├── sage-objects.json  # object data scanned by Sage
     └── yml_inventory.json  # inventory file including all YAML files
 ```
 
-4. add new context to existing ftdata
+4. generate ftdata from object data by using [gen_ftdata.py](https://github.ibm.com/ansible-risk-insight/sage-process/blob/main/sage_process/gen_ftdata.py)
+
 ```
-python patterns/enrich_context/tools/add_enrich_context.py \
-  --sage-dir /tmp/test/sage_dir \
-  --ftdata ~/ftdata/5.5.2/awft_v5.5.2_train.json \
-  --out-dir /tmp/test/tmp_dir \
-  -t GitHub-RHIBM \
-  -r IBM/Ansible-OpenShift-Provisioning
+python sage_process/gen_ftdata.py \
+  -f /tmp/test/sage_dir/sage-objects.json \
+  -o /tmp/test/sage_dir/ftdata.json
 ```
 
-output is below
+ftdata.json is generated. 
 ```
 /tmp/test
-├── tmp_dir
-│   ├── modified_ftdata.json # updated records
-│   └── only_org_ftdata.json # unchanged records
 └── sage_dir
-    ├── ftdata-modified.json # updated ftdata (including both updated and unchanged)
-    ├── ftdata.json
-    ├── scan_result.json
+    ├── ftdata.json   # generated ftdata
+    ├── sage-metadata.json
+    ├── sage-objects.json
     └── yml_inventory.json
 ```
 
@@ -183,7 +174,7 @@ output is below
 
 1. Do custom scan for all GitHub-RHIBM source with source json file.
 ```
-python patterns/custom_scan/custom_scan_all.py \
+python sage/custom_scan/custom_scan_all.py \
   -t GitHub-RHIBM \
   -s /tmp/RH_IBM_FT_data_GH_api.json \
   -o /tmp/batch
@@ -266,55 +257,23 @@ In `src_rb` dir, each repository file structure is reconstructed like below.
     └── wait_for_install_complete
 ```
 
-2. Before processing large ftdata, it needs to be splitted per repo_name and source.
-```
-python patterns/enrich_context/tools/split_ftdata.py \
-  -f ~/ftdata/5.5.2/awft_v5.5.2_train.json \
-  -d /tmp/ftdata/5.5.2
-```
 
-After running the command above, the ftdata is stored in a directory per repository.
+2. Check sage repo scan report
+The scan report can be generated with the following command.
 ```
-/tmp/ftdata/5.5.2/GitHub-RHIBM/IBM
-├── Ansible-OpenShift-Provisioning
-├── Simplify-Mainframe-application-deployments-using-Ansible
-├── ansible-automation-for-lmt
-├── ansible-for-i
-├── ansible-for-i-usecases
-├── ansible-kubernetes-ha-cluster
+# iterate for all sources.
+
+python sage/tools/object_report.py \
+  -i batch/results \
+  -t GitHub-AC 
+  -o /tmp/sage-scan-report-test 
+
+python sage/tools/object_report.py \
+  -i batch/results \
+  -t GitHub-ME 
+  -o /tmp/sage-scan-report-test 
+
 ....
 ```
 
-3. Run batch processing to add new context to existing ftdata
-```
-python patterns/enrich_context/tools/add_enrich_context_all.py \
-  --sage-dir /tmp/batch/results \
-  --ftdata-dir /tmp/ftdata/5.5.2 \
-  -t GitHub-RHIBM
-```
-
-Internally, ftdata generated at b2 is mapped with original ftdata by using similarity matching, and then relevant task is updated.  
-Then, the new ftdata file is created. The data is identical to original ftdata except addition a new context value. 
-```
-/tmp/batch/results/GitHub-RHIBM/IBM/Ansible-OpenShift-Provisioning/
-├── _modified_ftdata.json  # only updated tasks included
-├── _only_org_ftdata.json  # unchanged tasks included
-├── _tmp-ftdata.json  # tmp sage ftdata included
-├── enriched_ftdata.json  # new ftdata (new context added)
-├── findings.json
-├── ftdata.json
-├── scan_result.json
-└── yml_inventory.json
-
-```
-
-4. Check sage repo scan report
-The scan report can be generated with the following command.
-```
-python sage/tools/report.py \
-   --sage-dir /tmp/batch/results \
-   -o /tmp/batch/report \
-   -t GitHub-RHIBM \
-   --ft-data-dir /tmp/batch/data
-```
-The report example is [here](https://github.ibm.com/ansible-risk-insight/sage-scan-report/tree/main/report-GitHub-RHIBM)
+The example of the report is [here](https://github.ibm.com/ansible-risk-insight/sage-scan-report-test). 

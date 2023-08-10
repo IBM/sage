@@ -2,12 +2,12 @@
 
 ![custom-repo-scan](./images/custom-repo-scan.png)
 
-## Sage Ansible Code Scanning
+## Sage Scan
 
 First, you can generate sage object files for any source repository by the following command.
 
 ```
-$ python patterns/custom_scan/custom_scan.py -d <TARGET_DIR> -o <OUTPUT_DIR> -t <SOURCE> -r <REPO_NAME>
+$ python sage/custom_scan/custom_scan.py -d <TARGET_DIR> -o <OUTPUT_DIR> -t <SOURCE> -r <REPO_NAME>
 ```
 
 Descriptions for the arguments are:
@@ -47,20 +47,15 @@ Descriptions for the arguments are:
 
 ## Sage Processing
 
-Once, you get sage object files from the previous steps, you can process them to generate training dataset.
+#### Step: b3
+
+Once, you get sage object files from the previous steps, you can process them to generate training dataset by using [gen_ftdata.py](https://github.ibm.com/ansible-risk-insight/sage-process/blob/main/sage_process/gen_ftdata.py) in [sage-process](https://github.ibm.com/ansible-risk-insight/sage-process) project. 
 
 ```
-$ python sage/process/gen_ftdata.py -f <OBJECTS_FILE> -o <OUTPUT_FILE>
+$ python sage_process/gen_ftdata.py -f <OBJECTS_FILE> -o <OUTPUT_FILE>
 ```
 
 Descriptions for the arguments are:
 
 - `OBJECTS_FILE`: A generated sage-objects.json from the previous step. This can be a combined file with multiple sage-objects.json files.
 - `OUTPUT_FILE`: An output training dataset file
-#### Step: b3
-- Based on the scan result above, custom logic (E.g. [gen_ftdata.py](../sage/process/gen_ftdata.py)) can be applied to process the data. For example, fine-tuning dataset can be exported by using a script above. The record includes
-  - prompt
-  - input_script (context)
-  - output_script (task spec)
-
-  In this step, any scripts including ARI rules can be inserted to process the data. For example, data cleaning like post-processing can be applied before writing the record. Customers can also extend it by adding any scripts to manipulate the dataset. 

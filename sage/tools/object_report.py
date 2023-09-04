@@ -11,6 +11,8 @@ import collections
 import jsonpickle
 from report_models import ScanReport, ProjectSource, TaskCount, FileCount, \
     OtherCount, ScanCount, ErrorCount, RoleCount, FileResult, StateCount
+import tarfile
+from file_utils import get_target_files_from_gzip, load_file_contents
 
 OBJ_FILE="sage-objects.json"
 META_FILE="sage-metadata.json"
@@ -98,29 +100,47 @@ class ScanResultSummarizer:
         self.json_outdir = json_dir
         self.md_outdir = detail_repo_dir
         self.objects_root_dir = input_dir
+        self._report_buffer = []
+        self.max_buffer = 100
+        self.tar_file = None
 
-    def generate_repo_summary(self, obj_file):
+    def generate_repo_summary(self, obj_file, gzip_input):
         meta_file = obj_file.replace(OBJ_FILE, META_FILE)
-        summary, file_results = self.compute_scan_report(obj_file, meta_file)
-        _src_type = summary.projects[0].source
-        _repo_name = summary.projects[0].repo_name
-        result_json_dir = os.path.join(self.json_outdir, _src_type, _repo_name)
-        os.makedirs(result_json_dir, exist_ok=True)
-        json_path = os.path.join(result_json_dir, "summary.json")
-        with open(json_path, "w") as file:
-            file.write(summary.to_json(ensure_ascii=False))
-        return json_path, file_results
+        summary = self.compute_scan_report(obj_file, meta_file, gzip_input)
+        return summary
 
-    def compute_scan_report(self, object_json, meta_json):
-        metadata = load_json_data(meta_json)
-        objects =load_json_data(object_json)
+    def generate_repo_summary_all(self, files, repo_scan_results_path):
+        gzip_input = False
+        if self.tar_file:
+            gzip_input = True
+        for obj_file in files:
+            print(f"computing repo scan result ... {obj_file}")
+            repo_scan_report = self.generate_repo_summary(obj_file, gzip_input)
+            # generate repo md file if not passed
+            self.generate_repo_report(repo_scan_report)
+            self._report_buffer.append(repo_scan_report)
+            self.write_data(repo_scan_results_path)
+        self.write_all(repo_scan_results_path)
+        return
+
+    def compute_scan_report(self, object_json, meta_json, gzip_input):
+        if gzip_input:
+            metadata = load_file_contents(meta_json, self.tar_file)
+            objects = load_file_contents(object_json, self.tar_file)
+        else:
+            metadata = load_json_data(meta_json)
+            objects =load_json_data(object_json)
+            # convert to relative path
+            object_json = os.path.relpath(object_json, self.objects_root_dir)
+            meta_json = os.path.relpath(meta_json, self.objects_root_dir)
+
         if len(objects) == 0:
             print(f"{object_json} is empty")
             ps = ProjectSource(metadata[0]["source"]["type"], metadata[0]["source"]["repo_name"], object_json, meta_json)
             error = {"EmptyObjectsJsonError": 1}
             state = StateCount()
             state.unknown = 1
-            return ScanReport(project_count=1, projects=[ps], error=error, state_count=state), []
+            return ScanReport(project_count=1, projects=[ps], error=error, state_count=state)
         # summarize yml inventory
         target_files = []
         out_scopes = []
@@ -312,18 +332,17 @@ class ScanResultSummarizer:
             role_count=rc,
             task_count=tc,
             warning=warnings,
-            state_count=state
+            state_count=state,
+            file_results=file_results,
         )
-        return scan_result, file_results
+        return scan_result
     
-    def merge_repo_summary(self, target_dir):
-        json_files = glob.glob(os.path.join(target_dir, "**", "summary.json"), recursive=True)
+    def merge_repo_summary(self, repo_scan_results_path):
+        # json_files = glob.glob(os.path.join(target_dir, "**", "summary.json"), recursive=True)
+        results = load_json_data(repo_scan_results_path)
         merge_sr = ScanReport()
-        for jf in json_files:
-            if jf == os.path.join(target_dir, "summary.json"):
-                continue
-            jd = load_json_data(jf)
-            sr = ScanReport.from_dict(jd[0])
+        for jd in results:
+            sr = ScanReport.from_dict(jd)
             merge_sr = merge_sr.merge(sr)
         return merge_sr
 
@@ -486,9 +505,12 @@ class ScanResultSummarizer:
         cells.append(sr.task_count.total)
         return cells, c_num, r_num
 
-    def generate_repo_report(self, json_path, file_results):
-        _data = load_json_data(json_path)
-        sr = ScanReport.from_dict(_data[0])
+    def generate_repo_report(self, sr:ScanReport):
+        # _data = load_json_data(json_path)
+        # sr = ScanReport.from_dict(_data[0])
+        state = self._get_state(sr)
+        if state == "✔":
+            return
         src_type = sr.projects[0].source
         repo_name = sr.projects[0].repo_name
         metadata_file = sr.projects[0].metadata_file
@@ -508,15 +530,15 @@ class ScanResultSummarizer:
             mdFile.new_line(f"[< Src Type Report]({relative_parent_path})")
             mdFile.new_header(level=1, title='Scan Error')
             mdFile.new_line(f"Error: {sr.error}")
-            mdFile.new_line(f"metadata_file: {metadata_file.replace(self.objects_root_dir, '')}")
-            mdFile.new_line(f"object_file: {object_file.replace(self.objects_root_dir, '')}")
+            mdFile.new_line(f"metadata_file: {metadata_file}")
+            mdFile.new_line(f"object_file: {object_file}")
             mdFile.create_md_file()
             return
 
         mdFile.new_line(f"[<< Top Report]({relative_path})")
         mdFile.new_line(f"[< Src Type Report]({relative_parent_path})")
-        mdFile.new_line(f"metadata_file: {metadata_file.replace(self.objects_root_dir, '')}")
-        mdFile.new_line(f"object_file: {object_file.replace(self.objects_root_dir, '')}")
+        mdFile.new_line(f"metadata_file: {metadata_file}")
+        mdFile.new_line(f"object_file: {object_file}")
         mdFile.new_header(level=1, title='Detail reports')
         mdFile.new_line("[Scan count](#scan-count)")
         mdFile.new_line("[Scan count (per Type)](#scan-count-per-type)")
@@ -546,7 +568,7 @@ class ScanResultSummarizer:
         mdFile.new_header(level=1, title='Scan count (per File)')
         header = ["file", "type", "status", "task count", "error", "skip_reason", "role", "warning"]
         cells = header
-        for ty in file_results:
+        for ty in sr.file_results:
             status = "" # success or fail or skipped or others
             if not ty.in_scope:
                 status = "✔"
@@ -563,11 +585,11 @@ class ScanResultSummarizer:
             cells.append(ty.skip_reason)
             cells.append(ty.role)
             cells.append(ty.warning)
-        mdFile.new_table(columns=8, rows=len(file_results)+1, text=cells, text_align='left')
+        mdFile.new_table(columns=8, rows=len(sr.file_results)+1, text=cells, text_align='left')
         mdFile.create_md_file()
         return
     
-    def generate_src_report(self, src_type, json_path):
+    def generate_src_report(self, src_type, src_summary_path, repo_scan_results_path):
         src_dir = os.path.join(self.md_outdir, src_type)
         md_path = os.path.join(src_dir, "README.md")
         os.makedirs(src_dir, exist_ok=True)
@@ -583,7 +605,7 @@ class ScanResultSummarizer:
         mdFile.new_line("[Scan Summary (per Project)](#scan-summary-per-project)")
 
         # summary
-        _data = load_json_data(json_path)
+        _data = load_json_data(src_summary_path)
         sr = ScanReport.from_dict(_data[0])
 
         # project
@@ -607,32 +629,32 @@ class ScanResultSummarizer:
         relative_path = os.path.relpath(desc_md_path, src_dir)
         mdFile.new_paragraph(f'[skip reason]({relative_path})')
 
-
         # repo list
         mdFile.new_header(level=1, title='Scan Summary (per Project)')
         header = ["project", "state", "files", "playbooks (passed/total)", "taskfiles (passed/total)", "others", "skipped", "errors", "roles", "tasks", "warning"]
         cells = header
-        json_files = glob.glob(os.path.join(self.json_outdir, src_type, "**", "summary.json"), recursive=True)
+        # json_files = glob.glob(os.path.join(self.json_outdir, src_type, "**", "summary.json"), recursive=True)
+        repo_results = load_json_data(repo_scan_results_path)
+
+        passed_repos = []
+        failed_repos = []
+        for jd in repo_results:
+            sr = ScanReport.from_dict(jd)
+            state = self._get_state(sr)
+            if state == "✔":
+                passed_repos.append(sr)
+            else:
+                failed_repos.append(sr)
+
         row_count = 0
-        for jf in json_files:
-            if jf.endswith(os.path.join(self.json_outdir, src_type, "summary.json")):
-                continue
+        for sr in failed_repos:
             row_count += 1
-            _data = load_json_data(jf)
-            sr = ScanReport.from_dict(_data[0])
             src_type = sr.projects[0].source
             repo_name = sr.projects[0].repo_name
             repo_md_path = os.path.join(self.md_outdir, src_type, repo_name, "README.md")
             relative_path = os.path.relpath(repo_md_path, src_dir)
 
-            state = ""
-            if sr.state_count.fail != 0:
-                state = ""
-            elif sr.state_count.unknown != 0:
-                state = "-"
-            elif sr.state_count.fail == 0:
-                state = "✔"
-
+            state = self._get_state(sr)
             cells.append(f"[{repo_name}]({relative_path})")
             cells.append(state)
             cells.append(sr.file_count.total)
@@ -644,6 +666,27 @@ class ScanResultSummarizer:
             cells.append(sr.role_count.total)
             cells.append(sr.task_count.total)
             cells.append(sum(sr.warning.values()))
+
+        for sr in passed_repos:
+            row_count += 1
+            src_type = sr.projects[0].source
+            repo_name = sr.projects[0].repo_name
+            repo_md_path = os.path.join(self.md_outdir, src_type, repo_name, "README.md")
+            relative_path = os.path.relpath(repo_md_path, src_dir)
+
+            state = self._get_state(sr)
+            cells.append(repo_name)
+            cells.append(state)
+            cells.append(sr.file_count.total)
+            cells.append(f"{sr.file_count.playbooks.scanned}/{sr.file_count.playbooks.total - sr.file_count.playbooks.skipped}")
+            cells.append(f"{sr.file_count.taskfiles.scanned}/{sr.file_count.taskfiles.total - sr.file_count.taskfiles.skipped}")
+            cells.append(sr.file_count.others.total)
+            cells.append(sr.file_count.playbooks.skipped+sr.file_count.taskfiles.skipped)
+            cells.append(sr.file_count.errors.total+sr.file_count.playbooks.scan_error+sr.file_count.taskfiles.scan_error)
+            cells.append(sr.role_count.total)
+            cells.append(sr.task_count.total)
+            cells.append(sum(sr.warning.values()))
+
         mdFile.new_table(columns=11, rows=row_count+1, text=cells, text_align='left')
         mdFile.create_md_file()
         return
@@ -690,13 +733,7 @@ class ScanResultSummarizer:
             repo_md_path = os.path.join(self.md_outdir, src_type, "README.md")
             relative_path = os.path.relpath(repo_md_path, self.outdir)
             
-            state = ""
-            if sr.state_count.fail != 0:
-                state = ""
-            elif sr.state_count.unknown != 0:
-                state = "-"
-            elif sr.state_count.fail == 0:
-                state = "✔"
+            state = self._get_state(sr)
 
             cells.append(f"[{src_type}]({relative_path})")
             cells.append(state)
@@ -712,7 +749,6 @@ class ScanResultSummarizer:
         mdFile.new_table(columns=11, rows=row_count+1, text=cells, text_align='left')
         mdFile.create_md_file()
         return
-    
 
     def generate_reason_description(self):
         md_path = os.path.join(self.outdir, "REASON-DESCRIPTION.md")
@@ -728,6 +764,33 @@ class ScanResultSummarizer:
         mdFile.new_list(items)
         mdFile.create_md_file()
         return
+    
+    def _get_state(self, sr:ScanReport):
+        state = ""
+        if sr.state_count.fail != 0:
+            state = ""
+        elif sr.state_count.unknown != 0:
+            state = "-"
+        elif sr.state_count.fail == 0:
+            state = "✔"
+        return state
+
+    def write_data(self, file):
+        if len(self._report_buffer) > self.max_buffer:
+            with open(file, mode="a") as f:
+                for line in self._report_buffer:
+                    f.write(f"{line.to_json(ensure_ascii=False).rstrip()}\n")
+            self._report_buffer = []
+        return
+    
+    def write_all(self, file):
+        os.makedirs(os.path.join(self.json_outdir, src_type), exist_ok=True)
+        file = os.path.join(self.json_outdir, src_type, "repo_scan_results.json")
+        with open(file, mode="a") as f:
+            for line in self._report_buffer:
+                f.write(f"{line.to_json(ensure_ascii=False).rstrip()}\n")
+        self._report_buffer = []
+    
 
 def export_result(filepath, results):
     with open(filepath, "w") as file:
@@ -744,8 +807,11 @@ def load_json_data(filepath):
         records = file.readlines()
     data = []
     for record in records:
-        d = json.loads(record)
-        data.append(d)
+        try:
+            d = json.loads(record)
+            data.append(d)
+        except json.JSONDecodeError as e:
+            print(f"JSONDecodeError: {e}")
     return data
 
 def split_data(work_dir, obj_file, metadata_file):
@@ -770,6 +836,7 @@ def split_data(work_dir, obj_file, metadata_file):
     ds2.save_all()
     return
 
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="TODO")
     parser.add_argument("-o", "--out-dir", help='e.g. /tmp/batch/report')
@@ -777,6 +844,7 @@ if __name__ == '__main__':
     parser.add_argument("-f", "--file", help="object file")
     parser.add_argument("-m", "--metadata-file", help="metadata file")
     parser.add_argument("-t", "--type", help="e.g. GitHub-RHIBM")
+    parser.add_argument("--from-gzip", action="store_true", help="read objects.json from gzip file")
 
     args = parser.parse_args()
     outdir = args.out_dir
@@ -784,6 +852,7 @@ if __name__ == '__main__':
     metadata_file = args.metadata_file
     input_dir = args.input_dir
     src_type = args.type
+    gzip_input = args.from_gzip
 
     # if input are merged objects and metadata file, split data
     if obj_file and metadata_file and not input_dir:
@@ -791,37 +860,37 @@ if __name__ == '__main__':
         tmp_dir = tmpdir.name
         split_data(tmp_dir, obj_file, metadata_file)
         objects_dir = tmp_dir
-
-    objects_dir = os.path.join(input_dir, src_type)
-
-
+    
     if not os.path.exists(outdir):
         os.makedirs(outdir)
-    
     json_outdir = os.path.join(outdir, "result_json")
     os.makedirs(json_outdir, exist_ok=True)
     report_dir = os.path.join(outdir, "detail")
     os.makedirs(report_dir, exist_ok=True)
     
-
     summarizer = ScanResultSummarizer(outdir, json_outdir, report_dir, input_dir)
+    target_dir = os.path.join(summarizer.json_outdir, src_type)
+    os.makedirs(target_dir, exist_ok=True)
 
-    files = glob.glob(os.path.join(objects_dir, "**", OBJ_FILE), recursive=True)
+    repo_scan_results_path = os.path.join(target_dir, "repo_scan_results.json")
+    if gzip_input:
+        files = get_target_files_from_gzip(input_dir, OBJ_FILE)
+        with tarfile.open(input_dir, 'r:gz') as tar:
+            summarizer.tar_file = tar
+            summarizer.generate_repo_summary_all(files, repo_scan_results_path)
+    else:
+        objects_dir = os.path.join(input_dir, src_type)
+        files = glob.glob(os.path.join(objects_dir, "**", OBJ_FILE), recursive=True)
+        summarizer.generate_repo_summary_all(files, repo_scan_results_path)
 
-    src_type_summaries = {}
-    for obj_file in files:
-        print(f"computing repo scan result ... {obj_file}")
-        json_path, file_results = summarizer.generate_repo_summary(obj_file)
-        # per repo md file
-        summarizer.generate_repo_report(json_path, file_results)
 
     print("summarizing src_type scan result")
-    target_dir = os.path.join(json_outdir, src_type)
-    src_type_summary = summarizer.merge_repo_summary(target_dir)
-    with open(os.path.join(target_dir, "summary.json"), "w") as file:
+    src_type_summary = summarizer.merge_repo_summary(repo_scan_results_path)
+    src_summary_path = os.path.join(target_dir, "summary.json")
+    with open(src_summary_path, "w") as file:
         file.write(src_type_summary.to_json(ensure_ascii=False))
     # src_type md file
-    summarizer.generate_src_report(src_type, os.path.join(target_dir, "summary.json"))
+    summarizer.generate_src_report(src_type, src_summary_path, repo_scan_results_path)
 
     print("generating scan result for all")
     all_summary = summarizer.merge_src_summary(json_outdir)

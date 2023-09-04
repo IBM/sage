@@ -1,0 +1,5 @@
+sage_concurrency_work_dir/path_list
+sage_concurrency_work_dir/results
+sage_concurrency_work_dir/src_rb
+sage_concurrency_work_dir/redis_data/dump.rdb
+sage_concurrency_work_dir/flower_data/flower.db

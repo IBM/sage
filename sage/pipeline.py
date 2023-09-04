@@ -51,7 +51,7 @@ logger.setLevel(log_level)
 #     ari_rules_dir = os.getenv("ARI_RULES_DIR", "")
 
 ari_kb_data_dir = "<PATH/TO/ARK_KB_DATA_DIR>"
-ari_rules_dir = os.path.join(os.path.dirname(__file__), "custom_scan/rules")
+ftdata_rule_dir = os.path.join(os.path.dirname(__file__), "custom_scan/rules")
 
 
 @dataclass
@@ -67,12 +67,12 @@ class InputData:
 @dataclass
 class OutputData:
     input: InputData = field(default_factory=InputData)
-    data: dict = field(default_factory=dict)
+    data: any = None
     metadata: dict = field(default_factory=dict)
 
     # convert the output data into a json line string
     def serialize(self):
-        return json.dumps(self.data)
+        return jsonpickle.encode(self.data, make_refs=False, separators=(',', ':'))
 
 @dataclass
 class SerializableRunContext(object):
@@ -113,6 +113,8 @@ class SagePipeline(object):
     log_level_str: str = ""
     logger: logging.Logger = None
 
+    timeout: float = 0.0
+
     # whether it scans the failed files later: default to True
     do_multi_stage: bool = True
 
@@ -123,8 +125,9 @@ class SagePipeline(object):
     do_save_findings: bool = False
     do_save_metadata: bool = True
     do_save_objects: bool = True
-    do_save_result: bool = False
     do_save_output: bool = False
+
+    use_ftdata_rule: bool = False 
 
     aggregation_rule_id: str = ""
 
@@ -137,8 +140,6 @@ class SagePipeline(object):
 
     # special scan records
     yml_inventory: list = field(default_factory=list)
-    run_contexts: list = field(default_factory=list)
-    ftdata: list = field(default_factory=list)
 
     def __post_init__(self):
         if not self.logger:
@@ -158,8 +159,12 @@ class SagePipeline(object):
         _data_dir = self.ari_kb_data_dir or ari_kb_data_dir
         if not _data_dir:
             self.logger.warn(f"ARI KB dir is empty. ARI is running with very limited knowledge base data.")
-        _rules_dir = self.ari_rules_dir or ari_rules_dir
-        _rule_id_list = get_rule_id_list(_rules_dir)
+        _rules_dir = self.ari_rules_dir
+        _rule_id_list = []
+        if self.use_ftdata_rule:
+            if not _rules_dir:
+                _rules_dir = ftdata_rule_dir
+            _rule_id_list = get_rule_id_list(_rules_dir)
         _rules = []
         if self.ari_rules:
             _rules = self.ari_rules
@@ -185,6 +190,11 @@ class SagePipeline(object):
             target_dir = kwargs["target_dir"]
             self.scan_records["source"] = kwargs.get("source", {})
             return self._target_dir_to_input(target_dir)
+        elif isinstance(kwargs, dict) and "raw_yaml" in kwargs:
+            raw_yaml = kwargs["raw_yaml"]
+            self.scan_records["single_scan"] = True
+            self.scan_records["source"] = kwargs.get("source", {})
+            return self._single_yaml_to_input(raw_yaml)
         elif isinstance(kwargs, dict) and "ftdata_path" in kwargs:
             ftdata_path = kwargs["ftdata_path"]
             return self._ftdata_to_input(ftdata_path)
@@ -195,9 +205,10 @@ class SagePipeline(object):
         if self.accumulate and "output_dir" in kwargs:
             search_dir = kwargs["output_dir"]
             return self._task_context_to_output(search_dir)
-        elif isinstance(kwargs, dict) and kwargs.get("from_aggregated_results") in kwargs:
+        elif isinstance(kwargs, dict) and "from_aggregated_results" in kwargs:
             return self._aggregated_results_to_output()
-        return
+        # return SageProject by default
+        return self._sage_project_to_output()
 
     def _target_dir_to_input(self, target_dir):
         dir_size = get_dir_size(target_dir)
@@ -278,7 +289,22 @@ class SagePipeline(object):
             i += 1
 
         return input_list
-    
+
+    def _single_yaml_to_input(self, raw_yaml):
+        label, _, error = label_yml_file(yml_body=raw_yaml)
+        if error:
+            raise ValueError(f"failed to detect the input YAML type: {error}")
+        if label not in ["playbook", "taskfile"]:
+            raise ValueError(f"playbook and taskfile are the only supported types, but the input file is `{label}`")
+        input_data = InputData(
+            index=0,
+            total_num=1,
+            yaml=raw_yaml,
+            type=label,
+        )
+        input_list = [input_data]
+        return input_list
+
     # TODO: implement this
     def _ftdata_to_input(self, ftdata_path):
         pass
@@ -318,22 +344,43 @@ class SagePipeline(object):
                 err = traceback.format_exc()
                 self.logger.warn(f"failed to remove the temporary file \"{fpath}\": {err}")
         return output_list
+    
+    def _sage_project_to_output(self):
+        proj = self._create_sage_project()
+        output_data = OutputData(data=proj, metadata={"single_object": True})
+        output_list = [output_data]
+        return output_list
 
     # TODO: implement this
     def _aggregated_results_to_output(self):
         pass
+
+    def check_timeout(self):
+        limit_seconds = self.timeout
+        if limit_seconds <= 0:
+            return
+        
+        now = time.time()
+        begin = self.scan_records["begin"]
+        if (now - begin) > limit_seconds:
+            raise ValueError(f"TimeoutError: this scan took more than {limit_seconds} seconds")
 
     
     def run(self, **kwargs):
         self.logger.info("Running data pipeline")
         
         self._init_scan_records()
+
+        if isinstance(kwargs, dict) and "timeout" in kwargs:
+            self.timeout = kwargs["timeout"]
         
-        # By default, two types of input are supported
+        # By default, three types of input are supported
         #   - target_dir: path to a target directory
-        #   - ftdata_path: path to a ftdata file
+        #   - raw_yaml: YAML string of a playbook or a taskfile
+        #   - (TODO) ftdata_path: path to a ftdata file
         # You can override `to_input` function to define a customized one
         input_list = self.to_input(**kwargs)
+        self.check_timeout()
 
         # Specify output filepath with the following argument
         #   - output_dir: path to the output directory
@@ -345,70 +392,75 @@ class SagePipeline(object):
             scan_func = kwargs["scan_func"]
             scan_func(input_list)
 
+        # create yml inventory here, but this will be updated after scanning
+        self.yml_inventory = self.create_yml_inventory()
+
+        multi_stage = self.do_multi_stage
+        if "single_scan" in self.scan_records and self.scan_records["single_scan"]:
+            multi_stage = False
         yml_inventory_only = False
         if isinstance(kwargs, dict) and "yml_inventory_only" in kwargs:
             yml_inventory_only = kwargs["yml_inventory_only"]
         if yml_inventory_only:
-            self.yml_inventory = self.create_yml_inventory()
+            self.check_timeout()
             if output_dir and self.do_save_yml_inventory:
                 yml_inventory_path = os.path.join(output_dir, "yml_inventory.json")
                 self.save_yml_inventory(yml_inventory_path)
+                self.check_timeout()
             return
 
-        elif self.do_multi_stage:
+        elif multi_stage:
             self._multi_stage_scan(input_list)
+            self.check_timeout()
         else:
             self._single_scan(input_list)
+            self.check_timeout()
         
         self.yml_inventory = self.create_yml_inventory()
         if output_dir and self.do_save_yml_inventory:
             yml_inventory_path = os.path.join(output_dir, "yml_inventory.json")
             self.save_yml_inventory(yml_inventory_path)
+            self.check_timeout()
 
         if output_dir and self.do_save_findings:
             findings_path = os.path.join(output_dir, "findings.json")
             self.save_findings(findings_path)
+            self.check_timeout()
 
         if output_dir and self.do_save_metadata:
             metadata_path = os.path.join(output_dir, "sage-metadata.json")
             self.save_metadata(metadata_path)
+            self.check_timeout()
 
         if output_dir and self.do_save_objects:
             objects_path = os.path.join(output_dir, "sage-objects.json")
             self.save_objects(objects_path)
-
-        self._clear_scan_records()
+            self.check_timeout()
 
         output_list = self.to_output(**kwargs)
-        self.ftdata = [od.data for od in output_list if isinstance(od, OutputData)]
-
-        if output_dir and self.do_save_output:
-            output_path = os.path.join(output_dir, "ftdata.json")
-            self.save(output_list, output_path)
+        self.check_timeout()
+        output_data = None
+        if output_list:
+            if len(output_list) == 1 and output_list[0].metadata.get("single_object"):
+                output_data = output_list[0].data
+            else:
+                output_data = [od.data for od in output_list if isinstance(od, OutputData)]
 
         self.logger.info("Done")
 
-        run_contexts = []
-        for rc in self.run_contexts:
-            if not isinstance(rc, AnsibleRunContext):
-                continue
-            # jsonpickle has several issues for serializing AnsibleRunContext
-            # so we convert it to a serializable one here
-            src = SerializableRunContext.from_ansible_run_context(rc)
-            run_contexts.append(src)
+        self._clear_scan_records()
         
-        result = {
-            "inventory": self.yml_inventory,
-            "objects": run_contexts,
-            "ftdata": self.ftdata,
-        }
-        if output_dir and self.do_save_result:
-            output_path = os.path.join(output_dir, "result.json")
-            self.save_result(result, output_path)
-        return result
+        return output_data
 
     # TODO: implement this
-    def _single_scan(self):
+    def _single_scan(self, input_list):
+        start = time.time()
+        # first stage scan; scan the input as project
+        for input_data in input_list:
+            self.scan(start, input_data)
+            self.check_timeout()
+
+        self.check_timeout()
         return
 
     def _multi_stage_scan(self, input_list):
@@ -417,6 +469,7 @@ class SagePipeline(object):
         # first stage scan; scan the input as project
         for input_data in input_list:
             self.scan(start, input_data)
+            self.check_timeout()
 
         # make a list of missing files from the first scan
         missing_files = []
@@ -434,6 +487,7 @@ class SagePipeline(object):
                     _type = label
                     _name = filepath
                     missing_files.append((_type, _name, filepath, base_dir, "project"))
+            self.check_timeout()
 
         for role_name in self.scan_records["role_file_list"]:
             base_dir = os.path.abspath(self.scan_records["role_file_list"][role_name]["path"])
@@ -449,6 +503,7 @@ class SagePipeline(object):
                     _type = label
                     _name = filepath
                     missing_files.append((_type, _name, filepath, base_dir, "role"))
+            self.check_timeout()
         
         self.scan_records["missing_files"] = missing_files
         num_of_missing = len(missing_files)
@@ -466,6 +521,7 @@ class SagePipeline(object):
         start = time.time()
         for input_data in second_input_list:
             self.scan(start, input_data)
+            self.check_timeout()
         return
     
     def _init_scan_records(self):
@@ -479,10 +535,9 @@ class SagePipeline(object):
             "time": [],
             "size": 0,
             "objects": [],
+            "begin": time.time(),
         }
         self.yml_inventory = []
-        self.run_contexts = []
-        self.ftdata = []
         return
     
     def _clear_scan_records(self):
@@ -498,14 +553,36 @@ class SagePipeline(object):
         _type = input_data.type
         name = input_data.name
         path = input_data.path
+        raw_yaml = input_data.yaml
         original_type = input_data.metadata.get("original_type", _type)
         base_dir = input_data.metadata.get("base_dir", None)
+
+        kwargs = {
+            "type": _type,
+        }
+        if path:
+            kwargs["name"] = path
+        if raw_yaml:
+            kwargs["raw_yaml"] = raw_yaml
+        
         source = self.scan_records.get("source", {})
         display_name = name
         if base_dir and name.startswith(base_dir):
             display_name = name.replace(base_dir, "", 1)
             if display_name and display_name[-1] == "/":
                 display_name = display_name[:-1]
+
+        yaml_label_list = []
+        if self.yml_inventory:
+            for file_info in self.yml_inventory:
+                if not isinstance(file_info, dict):
+                    continue
+                fpath = file_info.get("path_from_root", "")
+                label = file_info.get("label", "")
+                role_info = file_info.get("role_info", {})
+                if not fpath or not label:
+                    continue
+                yaml_label_list.append((fpath, label, role_info))
 
         start_of_this_scan = time.time()
         thread_id = threading.get_native_id()
@@ -533,8 +610,7 @@ class SagePipeline(object):
                 objects = True
             begin = time.time()
             result = self.scanner.evaluate(
-                type=_type,
-                name=path,
+                **kwargs,
                 install_dependencies=True,
                 include_test_contents=include_tests,
                 objects=objects,
@@ -544,12 +620,12 @@ class SagePipeline(object):
                 taskfile_only=taskfile_only,
                 playbook_only=playbook_only,
                 base_dir=base_dir,
+                yaml_label_list=yaml_label_list,
             )
             elapsed = time.time() - begin
             scandata = self.scanner.get_last_scandata()
         except Exception:
             error = traceback.format_exc()
-            self.scanner.save_error(error)
             if error:
                 self.logger.error(f"Failed to scan {path} in {name}: error detail: {error}")
 
@@ -609,13 +685,32 @@ class SagePipeline(object):
             findings = scandata.findings
             self.scan_records["findings"].append({"target_type": _type, "target_name": name, "findings": findings})
 
+            trees = scandata.trees
+            annotation_dict = {}
+            skip_annotation_keys = [
+                "module.available_args",
+                "variable.unnecessary_loop_vars",
+            ]
+            for _tree in trees:
+                for call_obj in _tree.items:
+                    if not hasattr(call_obj, "annotations"):
+                        continue
+                    orig_annotations = call_obj.annotations
+                    annotations = {anno.key: anno.value for anno in orig_annotations if isinstance(anno.key, str) and anno.key not in skip_annotation_keys}
+                    spec_key = call_obj.spec.key
+                    if annotations:
+                        annotation_dict[spec_key] = annotations
+
             ari_objects = findings.root_definitions.get("definitions", {})
             for obj_type in ari_objects:
                 ari_objects_per_type = ari_objects[obj_type]
                 for ari_obj in ari_objects_per_type:
+                    ari_spec_key = ari_obj.key
                     sage_obj = convert_to_sage_obj(ari_obj, source)
                     if source:
                         sage_obj.set_source(source)
+                    if ari_spec_key in annotation_dict:
+                        sage_obj.annotations = annotation_dict[ari_spec_key]
                     self.scan_records["objects"].append(sage_obj)
 
             self.scan_records["time"].append({"target_type": _type, "target_name": name, "scan_seconds": elapsed})
@@ -626,8 +721,6 @@ class SagePipeline(object):
                 metadata["scan_timestamp"] = datetime.datetime.utcnow().isoformat(timespec="seconds")
                 metadata["pipeline_version"] = get_git_version()
                 self.scan_records["metadata"] = metadata
-
-            self.run_contexts.extend(scandata.contexts)
 
         elapsed_for_this_scan = round(time.time() - start_of_this_scan, 2)
         if elapsed_for_this_scan > 60:
@@ -709,19 +802,15 @@ class SagePipeline(object):
         with open(output_path, "w") as outfile:
             outfile.write("".join(lines))
 
-    def save_metadata(self, output_path):
+    def _create_sage_project(self):
         if not self.scan_records:
             return
-        if "metadata" not in self.scan_records:
-            return
-        
         source = self.scan_records.get("source", {})
         yml_inventory = self.yml_inventory
         objects = self.scan_records.get("objects", [])
         metadata = self.scan_records.get("metadata", {})
         scan_time = self.scan_records.get("time", [])
         dir_size = self.scan_records.get("size", 0)
-
         proj = SageProject.from_source_objects(
             source=source,
             yml_inventory=yml_inventory,
@@ -730,6 +819,15 @@ class SagePipeline(object):
             scan_time=scan_time,
             dir_size=dir_size,
         )
+        return proj
+
+    def save_metadata(self, output_path):
+        if not self.scan_records:
+            return
+        if "metadata" not in self.scan_records:
+            return
+        
+        proj = self._create_sage_project()        
         proj_metadata = proj.metadata()
         
         out_dir = os.path.dirname(output_path)
@@ -758,39 +856,23 @@ class SagePipeline(object):
         with open(output_path, "w") as outfile:
             outfile.write("".join(lines))
 
-    def save_result(self, result_dict, output_path):
-        out_dir = os.path.dirname(output_path)
-        if not os.path.exists(out_dir):
-            os.makedirs(out_dir, exist_ok=True)
-
-        with open(output_path, "w") as outfile:
-            json_str = jsonpickle.encode(result_dict, make_refs=False, separators=(',', ':'))
-            outfile.write(json_str)
-
-    def save(self, output_list, filepath):
-        if not filepath:
-            return
-        
-        dir_path = os.path.dirname(filepath)
-        os.makedirs(dir_path, exist_ok=True)
-
-        lines = []
-        for od in output_list:
-            line = od.serialize()
-            lines.append(line + "\n")
-        with open(filepath, "w") as file:
-            file.write("".join(lines))
 
 def get_yml_label(file_path, root_path):
+    if root_path and root_path[-1] == "/":
+        root_path = root_path[:-1]
+    
     relative_path = file_path.replace(root_path, "")
     if relative_path[-1] == "/":
         relative_path = relative_path[:-1]
     
-    label, name_count, error = label_yml_file(file_path)
+    label, name_count, error = label_yml_file(yml_path=file_path)
     role_name, role_path = get_role_info_from_path(file_path)
     role_info = None
     if role_name and role_path:
-        role_info = {"name": role_name, "path": role_path}
+        relative_role_path = role_path.replace(root_path, "")
+        if relative_role_path[0] == "/":
+            relative_role_path = relative_role_path[1:]
+        role_info = {"name": role_name, "path": role_path, "relative_path": relative_role_path}
 
     project_name, project_path = get_project_info_for_file(file_path, root_path)
     project_info = None

@@ -166,6 +166,24 @@ def get_defined_vars(object: SageObject, project: SageProject):
     resolver = VariableResolver(call_seq=obj_list)
     return resolver.get_defined_vars(object=target)
 
+# get used vars for the specified object
+# this returns a dict of var_name and var_value pairs, where values are resolved as much as possible
+# if variable resolution fails, the value will be a placeholder string like `{{ var_name }}`
+def get_used_vars(object: SageObject, project: SageProject):
+    obj_list = []
+    if isinstance(object, TaskFile):
+        role = find_parent_role(object, project)
+        if role:
+            obj_list = [role]
+    call_seq = get_call_sequence_by_entrypoint(entrypoint=object, project=project)
+    obj_list.extend(call_seq)
+    if not obj_list:
+        return {}
+    
+    target = obj_list[-1]
+    resolver = VariableResolver(call_seq=obj_list)
+    return resolver.get_used_vars(object=target)
+
 
 # returns all entrypoint objects
 # playbooks, roles and independent taskfiles (=not in a role) can be an entrypoint

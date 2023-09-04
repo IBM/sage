@@ -1,0 +1,20 @@
+[tool.poetry]
+name = "sage-concurrency"
+version = "0.1.0"
+description = ""
+authors = ["Your Name <you@example.com>"]
+# packages = [{include = "./*.py"}]
+
+[tool.poetry.dependencies]
+python = "^3.9"
+# ansible-risk-insight = "^0.1.10"
+ansible-risk-insight = { git = "https://github.com/ansible/ansible-risk-insight.git", branch = "main" }
+celery = "^5.3.1"
+redis = "^4.6.0"
+flower = "^1.0.0"
+
+# Install sage directly in Dockerfile because it seems that Poetry does not work with github.ibm.com
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

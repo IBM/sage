@@ -384,8 +384,9 @@ class SageProject(object):
             obj = self.get_object(key)
             if not obj:
                 raise ValueError(f"No object found for key `{key}`")
-            
-        return self._recursive_get_call_graph(obj)
+        
+        history = []
+        return self._recursive_get_call_graph(obj, history)
 
 
     def _get_children_keys_for_graph(self, obj):
@@ -419,7 +420,17 @@ class SageProject(object):
         
         return []
         
-    def _recursive_get_call_graph(self, obj):
+    def _recursive_get_call_graph(self, obj, history=None):
+        if not history:
+            history = []
+        
+        obj_key = obj.key
+        if obj_key in history:
+            return []
+        
+        _history = [h for h in history]
+        _history.append(obj_key)
+
         call_graph = [obj]
         children_keys = self._get_children_keys_for_graph(obj)
         if children_keys:
@@ -428,7 +439,7 @@ class SageProject(object):
                 if not c_obj:
                     logger.warn(f"No object found for key `{c_key}`; skip this node")
                     continue
-                sub_graph = self._recursive_get_call_graph(c_obj)
+                sub_graph = self._recursive_get_call_graph(c_obj, _history)
                 call_graph.extend(sub_graph)
         return call_graph
     

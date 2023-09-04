@@ -1,9 +1,7 @@
 import argparse
 import json
-import glob
 import jsonpickle
 import os
-from dataclasses import dataclass, field
 
 
 def prepare_source_dir(root_dir, yaml_file):
@@ -14,6 +12,11 @@ def prepare_source_dir(root_dir, yaml_file):
     ignore_list = [
         "m4rkw/minotaur-install",
         "rodo/ansible-tsung",
+
+        #GH2-PT
+        "AutomateCompliance/AnsibleCompliancePlaybooks",
+        "DevalexLLC/ansible-hardening-playbook",
+        "ugns/ansible-ssg",
     ]
     
     yaml_file_contents = load_json_data(yaml_file)
@@ -105,12 +108,27 @@ def write_result(filepath, results):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="TODO")
-    parser.add_argument("-f", "--file", help='source yaml file')
-    parser.add_argument("-t", "--type", help='type of data source')
-    parser.add_argument("-d", "--dir", help='tmp dir to recreate source dir')
-    parser.add_argument("-o", "--out-file", help="output directory for ")
+    parser.add_argument("-t", "--source-type", help='source type (e.g."GitHub-RHIBM")')
+    parser.add_argument("-s", "--source-json", help='source json file path (e.g. "/tmp/RH_IBM_FT_data_GH_api.json")')
+    parser.add_argument("-o", "--out-dir", help="output directory")
+    parser.add_argument("-p", "--project-list", help="project list")
     args = parser.parse_args()
 
-    target_dir = f"{args.dir}/{args.type}"
-    path_list = prepare_source_dir(target_dir, args.file)
-    write_result(args.out_file, path_list)
+    work_dir = args.out_dir
+    src_type = args.source_type
+    src_json = args.source_json
+    project_list = args.project_list
+    src_rb_dir = os.path.join(work_dir, "src_rb")
+    path_list_dir = os.path.join(work_dir, "path_list")
+    result_dir = os.path.join(work_dir, "results")
+
+    os.makedirs(work_dir, exist_ok=True)
+    os.makedirs(src_rb_dir, exist_ok=True)
+    os.makedirs(path_list_dir, exist_ok=True)
+    os.makedirs(result_dir, exist_ok=True)
+
+    adir = os.path.join(src_rb_dir, src_type)
+    if not os.path.exists(adir) or len(os.listdir(adir)) == 0:
+        outfile = os.path.join(path_list_dir, f"path-list-{src_type}.txt")
+        path_list = prepare_source_dir(adir, src_json)
+        write_result(outfile, path_list)

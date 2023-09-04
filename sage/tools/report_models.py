@@ -244,6 +244,7 @@ class ScanReport(object):
     warning: dict = field(default_factory=dict)
     error: dict = field(default_factory=dict)
     state_count: StateCount = field(default_factory=StateCount)
+    file_results: List[FileResult] = field(default_factory=list)
 
     @classmethod
     def from_dict(cls, obj):
@@ -256,6 +257,7 @@ class ScanReport(object):
         c.warning = obj.get("warning", {})
         c.error = obj.get("error", {})
         c.state_count = StateCount.from_dict(obj.get("state_count", {}))
+        c.file_results = FileResult.from_dict(obj.get("file_results", []))
         return c
 
     def merge(self, obj):

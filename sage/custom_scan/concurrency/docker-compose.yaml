@@ -1,0 +1,80 @@
+version: '3'
+services:
+  redis:
+    image: redis:6-alpine
+    hostname: redis
+    user: redis
+    ports:
+      - 6379:6379
+    expose:
+      - "6379"
+    volumes:
+      - type: bind
+        source: ./sage_concurrency_work_dir/redis_data
+        target: /data
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:    
+        - GIT_ACCESS_TOKEN=${GIT_ACCESS_TOKEN}
+    hostname: worker
+    command: celery --app tasks.celery worker --concurrency 8 --loglevel=info
+    environment:
+      - REDIS_SERVER_URL=redis
+      - ARI_KB_DATA_DIR=/ari-kb/data
+      - WORK_DIR=/work_dir
+    volumes:
+      - type: bind
+        source: ${ARI_KB_DATA_DIR}
+        target: /ari-kb/data
+      - type: bind
+        source: ./sage_concurrency_work_dir
+        target: /work_dir
+    depends_on:
+      - redis
+  dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:    
+        - GIT_ACCESS_TOKEN=${GIT_ACCESS_TOKEN}
+    command: celery --app tasks.celery --broker=redis://redis:6379/1 flower --persistent=True --db="/work_dir/flower_data/flower.db" --port=5555
+    ports:
+      - 5556:5555
+    environment:
+      - REDIS_SERVER_URL=redis
+      - ARI_KB_DATA_DIR=/ari-kb/data
+      - WORK_DIR=/work_dir
+      - FLOWER_DATABASE=/work_dir/flower_data/flower.db
+    volumes:
+      - type: bind
+        source: ${ARI_KB_DATA_DIR}
+        target: /ari-kb/data
+      - type: bind
+        source: ./sage_concurrency_work_dir
+        target: /work_dir
+    depends_on:
+      - redis
+      - worker
+  trigger:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:    
+        - GIT_ACCESS_TOKEN=${GIT_ACCESS_TOKEN}
+    hostname: trigger
+    command: python trigger.py
+    environment:
+      - REDIS_SERVER_URL=redis
+      - ARI_KB_DATA_DIR=/ari-kb/data
+    volumes:
+      - type: bind
+        source: ${ARI_KB_DATA_DIR}
+        target: /ari-kb/data
+      - type: bind
+        source: ./sage_concurrency_work_dir
+        target: /work_dir
+    depends_on:
+      - redis
+      - worker

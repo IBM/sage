@@ -59,6 +59,61 @@ class SageObject(object):
         sage_obj.set_source(source)
         return sage_obj
     
+    @classmethod
+    def to_ari_obj(cls, sage_obj):
+        type_str = cls.__name__.lower()
+
+        cls_mapping = {
+            "module": ARIModule,
+            "task": ARITask,
+            "taskfile": ARITaskFile,
+            "role": ARIRole,
+            "playbook": ARIPlaybook,
+            "play": ARIPlay,
+            "collection": ARICollection,
+            "project": ARIRepository,
+        }
+        cls = cls_mapping.get(type_str, None)
+        if not cls:
+            return None
+        
+        ari_obj = cls()
+        if not hasattr(sage_obj, "__dict__"):
+            return ari_obj
+
+        default_attr_mapping = {
+            "filepath": "defined_in",
+        }
+        type_specific_attr_mapping = {
+            "role": {
+                "ari_source": "source",
+            },
+            "collection": {
+                "filepath": "path",
+            }
+        }
+        
+        attr_mapping = default_attr_mapping.copy()
+        if type_str:
+            _attr_mapping = type_specific_attr_mapping.get(type_str, {})
+            attr_mapping.update(_attr_mapping)
+
+        for key, val in sage_obj.__dict__.items():
+            attr_name = key
+            if key in attr_mapping:
+                attr_name = attr_mapping[key]
+            
+            if hasattr(ari_obj, attr_name):
+                setattr(ari_obj, attr_name, val)
+
+        type_mapping = {
+            "project": "repository",
+        }
+        if ari_obj.type in type_mapping:
+            ari_obj.type = type_mapping[ari_obj.type]
+
+        return ari_obj
+    
     def set_source(self, source: dict={}):
         self.source = source
         if source:
@@ -271,6 +326,27 @@ def convert_to_sage_obj(ari_obj, source: dict={}):
         raise ValueError(f"{type(ari_obj)} is not a supported type for Sage objects")
 
 
+def convert_to_ari_obj(sage_obj):
+    if isinstance(sage_obj, Module):
+        return Module.to_ari_obj(sage_obj)
+    elif isinstance(sage_obj, Task):
+        return Task.to_ari_obj(sage_obj)
+    elif isinstance(sage_obj, TaskFile):
+        return TaskFile.to_ari_obj(sage_obj)
+    elif isinstance(sage_obj, Role):
+        return Role.to_ari_obj(sage_obj)
+    elif isinstance(sage_obj, Playbook):
+        return Playbook.to_ari_obj(sage_obj)
+    elif isinstance(sage_obj, Play):
+        return Play.to_ari_obj(sage_obj)
+    elif isinstance(sage_obj, Collection):
+        return Collection.to_ari_obj(sage_obj)
+    elif isinstance(sage_obj, Project):
+        return Project.to_ari_obj(sage_obj)
+    else:
+        raise ValueError(f"{type(sage_obj)} is not a supported type for ARI objects")
+
+
 attr_list = [
     "collections",
     "modules",
@@ -305,8 +381,22 @@ class SageProject(object):
     dir_size: int = 0
     pipeline_version: str = ""
 
+    # only used for ARI RAM conversion
+    ari_metadata: dict = field(default_factory=dict)
+    dependencies: list = field(default_factory=list)
+
     @classmethod
-    def from_source_objects(cls, source: dict, yml_inventory: list, objects: list, metadata: dict, scan_time: list, dir_size: int):
+    def from_source_objects(
+        cls,
+        source: dict,
+        yml_inventory: list,
+        objects: list,
+        metadata: dict,
+        scan_time: list,
+        dir_size: int,
+        ari_metadata: dict={},
+        dependencies: list=[],
+        ):
         proj = cls()
         proj.source = source
         if source:
@@ -322,6 +412,9 @@ class SageProject(object):
         proj.pipeline_version = metadata.get("pipeline_version", "")
         proj.scan_time_detail = scan_time
         proj.dir_size = dir_size
+
+        proj.ari_metadata = ari_metadata
+        proj.dependencies = dependencies
         return proj
     
     def add_object(self, obj: SageObject):
@@ -473,6 +566,8 @@ class SageProject(object):
             "dir_size": self.dir_size,
             "pipeline_version": self.pipeline_version,
             "yml_files": self.yml_files,
+            "ari_metadata": self.ari_metadata,
+            "dependencies": self.dependencies,
         }
 
 

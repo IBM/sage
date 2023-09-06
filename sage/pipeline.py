@@ -722,6 +722,11 @@ class SagePipeline(object):
                 metadata["pipeline_version"] = get_git_version()
                 self.scan_records["metadata"] = metadata
 
+                ari_metadata = findings.metadata.copy()
+                dependencies = findings.dependencies.copy()
+                self.scan_records["ari_metadata"] = ari_metadata
+                self.scan_records["dependencies"] = dependencies
+
         elapsed_for_this_scan = round(time.time() - start_of_this_scan, 2)
         if elapsed_for_this_scan > 60:
             self.logger.warn(f"It took {elapsed_for_this_scan} sec. to process [{i+1}/{num}] {_type} {name}")
@@ -811,6 +816,8 @@ class SagePipeline(object):
         metadata = self.scan_records.get("metadata", {})
         scan_time = self.scan_records.get("time", [])
         dir_size = self.scan_records.get("size", 0)
+        ari_metadata = self.scan_records.get("ari_metadata", {})
+        dependencies = self.scan_records.get("dependencies", [])
         proj = SageProject.from_source_objects(
             source=source,
             yml_inventory=yml_inventory,
@@ -818,6 +825,8 @@ class SagePipeline(object):
             metadata=metadata,
             scan_time=scan_time,
             dir_size=dir_size,
+            ari_metadata=ari_metadata,
+            dependencies=dependencies,
         )
         return proj
 

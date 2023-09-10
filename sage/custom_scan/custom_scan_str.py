@@ -3,15 +3,6 @@ import os
 from sage.pipeline import SagePipeline
 
 
-ARI_KB_DATA_DIR = os.getenv("ARI_KB_DATA_DIR", None)
-
-if ARI_KB_DATA_DIR is None:
-    raise ValueError(f"Please specify an existing ARI KB dir by an env param:\n$ export ARI_KB_DATA_DIR=<PATH/TO/ARI_KB_DATA_DIR>")
-
-if not os.path.exists(ARI_KB_DATA_DIR):
-    raise ValueError(f"the ARI_KB_DATA_DIR does not exist: {ARI_KB_DATA_DIR}")
-
-
 EXAMPLE = '''
 ---
 - name: AWS EC2 Cloud Operations
@@ -50,9 +41,7 @@ EXAMPLE = '''
 def main():
     input_yaml = EXAMPLE
 
-    sp = SagePipeline(
-        ari_kb_data_dir=ARI_KB_DATA_DIR,
-    )
+    sp = SagePipeline()
 
     # process the input playbook by SagePipeline
     project = sp.run(

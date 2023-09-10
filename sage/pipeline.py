@@ -35,22 +35,6 @@ if log_level is None:
     log_level = logging.INFO
 logger.setLevel(log_level)
 
-# ari_kb_dir = os.getenv("ARI_KB_DIR", None)
-# ari_kb_data_dir = ""
-# ari_rules_dir = ""
-# if ari_kb_dir and \
-#     os.path.exists(ari_kb_dir) and \
-#     os.path.exists(os.path.join(ari_kb_dir, "data")) and \
-#     os.path.exists(os.path.join(ari_kb_dir, "rules")):
-
-#     ari_kb_data_dir = os.path.join(ari_kb_dir, "data")
-#     ari_rules_dir = os.path.join(ari_kb_dir, "rules")
-
-# else:
-#     ari_kb_data_dir = os.getenv("ARI_KB_DATA_DIR", "")
-#     ari_rules_dir = os.getenv("ARI_RULES_DIR", "")
-
-ari_kb_data_dir = "<PATH/TO/ARK_KB_DATA_DIR>"
 ftdata_rule_dir = os.path.join(os.path.dirname(__file__), "custom_scan/rules")
 
 
@@ -156,9 +140,9 @@ class SagePipeline(object):
         self.logger = logger
 
     def init_scanner(self):
-        _data_dir = self.ari_kb_data_dir or ari_kb_data_dir
+        _data_dir = self.ari_kb_data_dir
         if not _data_dir:
-            self.logger.warn(f"ARI KB dir is empty. ARI is running with very limited knowledge base data.")
+            self.logger.debug(f"ARI KB data dir is not configured.")
         _rules_dir = self.ari_rules_dir
         _rule_id_list = []
         if self.use_ftdata_rule:
@@ -179,6 +163,8 @@ class SagePipeline(object):
                 rules=_rules,
                 log_level=self.log_level_str,
             ),
+            read_ram=False,
+            write_ram=False,
             silent=True,
         )
         self.scanner = scanner

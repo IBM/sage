@@ -119,6 +119,18 @@ class SageObject(object):
         if source:
             self.source_id = json.dumps(source, separators=(',', ':'))
         return
+    
+    def set_annotation(self, key: str, value: any):
+        self.annotations[key] = value
+        return
+
+    def get_annotation(self, key: str, __default: any = None):
+        return self.annotations.get(key, __default)
+    
+    def delete_annotation(self, key: str):
+        if key in self.annotations:
+            self.annotations.pop(key)
+        return
 
 
 @dataclass
@@ -569,6 +581,13 @@ class SageProject(object):
             "ari_metadata": self.ari_metadata,
             "dependencies": self.dependencies,
         }
+    
+    def objects(self):
+        _objects = []
+        for attr in attr_list:
+            objects_per_type = getattr(self, attr, [])
+            _objects.extend(objects_per_type)
+        return _objects
 
 
 @dataclass
@@ -604,3 +623,19 @@ def load_objects(fpath: str) -> SageObjects:
     obj = SageObjects(_projects=proj_list)
     return obj
 
+
+def save_objects(fpath: str, sage_objects: SageObjects):
+    projects = sage_objects.projects()
+    all_objects = []
+    for project in projects:
+        _objects = project.objects()
+        all_objects.extend(_objects)
+    lines = []
+    for obj in all_objects:
+        if not isinstance(obj, SageObject):
+            raise ValueError(f"expected type: SageObject, detected type: {type(obj)}")
+        line = jsonpickle.encode(obj, make_refs=False, separators=(',', ':')) + "\n"
+        lines.append(line)
+    with open(fpath, "w") as file:
+        file.write("".join(lines))
+    return

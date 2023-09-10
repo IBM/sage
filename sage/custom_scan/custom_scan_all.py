@@ -7,15 +7,6 @@ from sage.tools.src_rebuilder import write_result, prepare_source_dir
 from ansible_risk_insight.scanner import ARIScanner, Config
 
 
-ARI_KB_DATA_DIR = os.getenv("ARI_KB_DATA_DIR", None)
-
-if ARI_KB_DATA_DIR is None:
-    raise ValueError(f"Please specify an existing ARI KB dir by an env param:\n$ export ARI_KB_DATA_DIR=<PATH/TO/ARI_KB_DATA_DIR>")
-
-if not os.path.exists(ARI_KB_DATA_DIR):
-    raise ValueError(f"the ARI_KB_DATA_DIR does not exist: {ARI_KB_DATA_DIR}")
-
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="TODO")
     parser.add_argument("-t", "--source-type", help='source type (e.g."GitHub-RHIBM")')
@@ -70,9 +61,7 @@ if __name__ == "__main__":
         "bosh-io/releases-index"
     ]
 
-    dp = SagePipeline(
-        ari_kb_data_dir=ARI_KB_DATA_DIR,
-    )
+    dp = SagePipeline()
 
     timer_path = "/tmp/custom-scan-all-timer.json"
     for repo_name in repo_names:

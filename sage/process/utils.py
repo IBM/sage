@@ -1,5 +1,13 @@
 from sage.models import SageObject, SageProject, Playbook, TaskFile, Play, Task, Role
 from sage.process.variable_resolver import VariableResolver
+from sage.process.knowledge_base import KnowledgeBase, MODULE_OBJECT_ANNOTATION_KEY
+from sage.process.annotations import (
+    set_module_spec_annotations,
+    set_module_arg_key_annotations,
+    set_module_arg_value_annotations,
+    set_variable_annotations,
+    omit_object_annotations,
+)
 from ansible_risk_insight.models import Annotation
 
 
@@ -185,6 +193,23 @@ def get_used_vars(object: SageObject, project: SageProject):
     return resolver.get_used_vars(object=target)
 
 
+def set_vars_annotation(object: SageObject, project: SageProject):
+    obj_list = []
+    if isinstance(object, TaskFile):
+        role = find_parent_role(object, project)
+        if role:
+            obj_list = [role]
+    call_seq = get_call_sequence_by_entrypoint(entrypoint=object, project=project)
+    obj_list.extend(call_seq)
+    if not obj_list:
+        return []
+    
+    resolver = VariableResolver(call_seq=obj_list)
+    obj_vars_list = resolver.set_used_vars(set_annotation=True)
+    obj_list = [obj for (obj, _, _) in obj_vars_list]
+    return obj_list
+
+
 # returns all entrypoint objects
 # playbooks, roles and independent taskfiles (=not in a role) can be an entrypoint
 def list_entrypoints(project: SageProject):
@@ -194,3 +219,37 @@ def list_entrypoints(project: SageProject):
     # only independent taskfiles; skip taskfiles in role
     entrypoints.extend([tf for tf in project.taskfiles if not tf.role])
     return entrypoints
+
+
+# set `module_info` in task
+# this requires ARI KB data for non-builtin modules
+def set_module_info_to_task(task: Task):
+    kb = KnowledgeBase()
+    return kb.set_module_info(task)
+
+
+def set_primary_annotations_to_project(project: SageProject):
+    resolver = VariableResolver()
+    # set variable data
+    project = resolver.resolve_all_vars_in_project(project=project)
+    kb = KnowledgeBase()
+    tasks = project.tasks
+    for task in tasks:
+        # set module_info/include_info
+        kb.resolve_task(task, set_module_object_annotation=True)
+
+        # set P001 annotations
+        set_module_spec_annotations(task)
+
+        # set P002 annotations
+        set_module_arg_key_annotations(task, knowledge_base=kb)
+
+        # set P003 annotations
+        set_module_arg_value_annotations(task)
+
+        # set P004 annotations
+        set_variable_annotations(task)
+
+        # remove temporary annotations (to avoid saving large data)
+        omit_object_annotations(task)
+    return project

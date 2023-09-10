@@ -5,18 +5,8 @@ import traceback
 from celery import Celery
 
 
-ARI_KB_DATA_DIR = os.getenv("ARI_KB_DATA_DIR", None)
 
-if ARI_KB_DATA_DIR is None:
-    raise ValueError(f"Please specify an existing ARI KB dir by an env param:\n$ export ARI_KB_DATA_DIR=<PATH/TO/ARI_KB_DATA_DIR>")
-
-if not os.path.exists(ARI_KB_DATA_DIR):
-    raise ValueError(f"the ARI_KB_DATA_DIR does not exist: {ARI_KB_DATA_DIR}")
-
-
-dp = SagePipeline(
-    ari_kb_data_dir=ARI_KB_DATA_DIR,
-)
+dp = SagePipeline()
 
 
 REDIS_SERVER_URL = os.getenv("REDIS_SERVER_URL", 'localhost')

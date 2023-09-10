@@ -9,12 +9,7 @@
     $ pip install -e .
     ```
 
-2. Preapre ARI KB Data and set the KB dir to environment variable
-     
-    ```
-    $ export ARI_KB_DATA_DIR=<PATH/TO/YOUR/ARI_KB_DATA_DIR>
-    ```
-3. Run the following command
+2. Run the following command
 
     #### 2 arguments in the command below
     
@@ -27,7 +22,7 @@
     $ python sage/custom_scan/custom_scan.py -d <PATH/TO/PROJECT> -o <OUTPUT_DIR>
     ```
 
-4. Confirm the output files
+3. Confirm the output files
 
     The following 5 output files should be created in the specfied output directory.
 

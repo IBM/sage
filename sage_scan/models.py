@@ -279,8 +279,6 @@ class Play(SageObject):
     become: BecomeInfo = None
     variables: dict = field(default_factory=dict)
 
-    # embed this data when role is resolved
-    roles_info: list = field(default_factory=list)
     task_loading: dict = field(default_factory=dict)
 
 
@@ -526,9 +524,9 @@ class SageProject(object):
             return taskfile_key
         elif isinstance(obj, Play):
             roles = []
-            if obj.roles_info:
-                for ri in obj.roles_info:
-                    role_key = ri.get("key", None)
+            if obj.roles:
+                for rip in obj.roles:
+                    role_key = rip.role_info.get("key", None)
                     if role_key:
                         roles.append(role_key)
             return obj.pre_tasks + obj.tasks + roles + obj.post_tasks

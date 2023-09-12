@@ -18,7 +18,7 @@ import os
 import sys
 import jsonpickle
 import argparse
-from sage.pipeline import SerializableRunContext
+from sage_scan.pipeline import SerializableRunContext
 from ansible_risk_insight.models import (
     Module,
     Task,

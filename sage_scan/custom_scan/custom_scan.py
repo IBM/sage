@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from sage.pipeline import SagePipeline
+from sage_scan.pipeline import SagePipeline
 import os
 import argparse
 

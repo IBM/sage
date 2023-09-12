@@ -18,7 +18,7 @@ import re
 import copy
 from pathlib import Path
 from dataclasses import dataclass, field
-from sage.models import (
+from sage_scan.models import (
     Collection,
     Playbook,
     Play,
@@ -28,7 +28,7 @@ from sage.models import (
     SageObject,
     SageProject,
 )
-from sage.process.annotations import (
+from sage_scan.process.annotations import (
     ARGUMENTS_ANNOTATION_KEY,
     VARIABLES_SET_ANNOTATION_KEY,
     VARIABLES_USED_ANNOTATION_KEY,

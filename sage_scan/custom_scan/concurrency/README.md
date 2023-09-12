@@ -13,7 +13,7 @@
 ```bash
 $ git clone https://github.ibm.com/ansible-risk-insight/sage.git
 
-$ cd sage/custom_scan/concurrency
+$ cd sage_scan/custom_scan/concurrency
 ```
 
 ### 2. Export these 2 environment variables

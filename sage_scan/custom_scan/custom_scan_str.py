@@ -16,7 +16,7 @@
 
 import os
 
-from sage.pipeline import SagePipeline
+from sage_scan.pipeline import SagePipeline
 
 
 EXAMPLE = '''

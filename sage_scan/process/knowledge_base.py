@@ -16,12 +16,12 @@
 
 import os
 from dataclasses import dataclass
-from sage.models import (
+from sage_scan.models import (
     Task,
     Module,
     SageProject,
 )
-from sage.process.annotations import MODULE_OBJECT_ANNOTATION_KEY
+from sage_scan.process.annotations import MODULE_OBJECT_ANNOTATION_KEY
 from ansible_risk_insight.models import (
     ExecutableType,
     Module as ARIModule,

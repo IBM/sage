@@ -7,7 +7,7 @@
 First, you can generate sage object files for any source repository by the following command.
 
 ```
-$ python sage/custom_scan/custom_scan.py -d <TARGET_DIR> -o <OUTPUT_DIR> -t <SOURCE> -r <REPO_NAME>
+$ python sage_scan/custom_scan/custom_scan.py -d <TARGET_DIR> -o <OUTPUT_DIR> -t <SOURCE> -r <REPO_NAME>
 ```
 
 Descriptions for the arguments are:

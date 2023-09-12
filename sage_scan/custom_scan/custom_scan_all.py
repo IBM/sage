@@ -14,12 +14,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from sage.pipeline import SagePipeline
+from sage_scan.pipeline import SagePipeline
 import os
 import json
 import time
 import argparse
-from sage.tools.src_rebuilder import write_result, prepare_source_dir
+from sage_scan.tools.src_rebuilder import write_result, prepare_source_dir
 from ansible_risk_insight.scanner import ARIScanner, Config
 
 

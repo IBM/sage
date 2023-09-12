@@ -292,8 +292,8 @@ class ScanReport(object):
 
 
 if __name__ == "__main__":
-    file1 = "sage/tools/summary-sample.json"
-    file2 = "sage/tools/summary-sample.json"
+    file1 = "sage_scan/tools/summary-sample.json"
+    file2 = "sage_scan/tools/summary-sample.json"
 
     d1 = {}
     d2 = {}

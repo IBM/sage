@@ -13,7 +13,7 @@ classifiers = [
     "Programming Language :: Python :: 3",
 ]
 dependencies = [
-    "ansible-risk-insight@git+https://github.com/ansible/ansible-risk-insight@main",
+    "ansible-risk-insight",
     "Levenshtein",
     "treelib",
 ]

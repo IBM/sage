@@ -195,7 +195,7 @@ def set_module_arg_value_annotations(task: Task):
             for key in module_options:
                 raw_value = module_options[key]
                 resolved_value = None
-                if len(arguments.templated) >= 1:
+                if arguments and len(arguments.templated) >= 1:
                     resolved_value = arguments.templated[0][key]
                 spec = None
                 for arg_spec in module.arguments:
@@ -222,7 +222,10 @@ def set_module_arg_value_annotations(task: Task):
                             # if the variable is loop var, use the element type as actual type
                             resolved_element = None
                             if resolved_value:
-                                resolved_element = resolved_value[0]
+                                if isinstance(resolved_value, list):
+                                    resolved_element = resolved_value[0]
+                                else:
+                                    resolved_element = resolved_value
                             if resolved_element:
                                 actual_type = type(resolved_element).__name__
                         else:
@@ -256,7 +259,9 @@ def set_module_arg_value_annotations(task: Task):
                 if unknown_type_val:
                     unknown_type_values.append(d)
 
-                sub_args = arguments.get(key)
+                sub_args = None
+                if arguments and isinstance(arguments, dict):
+                    sub_args = arguments.get(key)
                 if sub_args:
                     undefined_vars = [v.name for v in sub_args.vars if v and v.type == VariableType.Unknown]
                     if undefined_vars:
@@ -276,7 +281,7 @@ def set_variable_annotations(task: Task):
     task_arg_keys = []
     arguments = task.get_annotation(ARGUMENTS_ANNOTATION_KEY)
     variable_use = task.get_annotation(VARIABLES_USED_ANNOTATION_KEY)
-    if arguments.type == ArgumentsType.DICT:
+    if arguments and arguments.type == ArgumentsType.DICT:
         task_arg_keys = list(arguments.raw.keys())
     if variable_use:
         for v_name in variable_use:

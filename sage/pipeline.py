@@ -690,6 +690,7 @@ class SagePipeline(object):
             trees = scandata.trees
             annotation_dict = {}
             skip_annotation_keys = [
+                "",
                 "module.available_args",
                 "variable.unnecessary_loop_vars",
             ]

@@ -45,6 +45,7 @@ class SageObject(object):
     name: str = ""
     source: dict = field(default_factory=dict)
     source_id: str = ""
+    test_object: bool = False
     annotations: Dict[str, any] = field(default_factory=dict)
 
     @classmethod

@@ -32,6 +32,7 @@ from sage.process.annotations import (
     ARGUMENTS_ANNOTATION_KEY,
     VARIABLES_SET_ANNOTATION_KEY,
     VARIABLES_USED_ANNOTATION_KEY,
+    is_loop_var,
 )
 from ansible_risk_insight.models import (
     Variable,
@@ -64,14 +65,14 @@ class VariableResolver(object):
         for obj, defnied_vars, _ in obj_and_vars_list:
             if obj.key == object.key:
                 return defnied_vars
-        return None
+        return {}
     
     def get_used_vars(self, object: SageObject, call_seq: list):
         obj_and_vars_list = self.set_used_vars(call_seq=call_seq)
         for obj, _, used_vars in obj_and_vars_list:
             if obj.key == object.key:
                 return used_vars
-        return None
+        return {}
 
     def set_defined_vars(self, call_seq: list):
         obj_and_vars_list = self.traverse(call_seq=call_seq)
@@ -97,6 +98,7 @@ class VariableResolver(object):
 
     def traverse(self, call_seq: list):
         context = VariableContext()
+        obj_and_vars_list = []
         for obj in call_seq:
             context.add(obj)
             if isinstance(obj, Task):
@@ -160,13 +162,31 @@ class VariableResolver(object):
                     is_mutable=is_mutable,
                 )
                 # deep copy the history here because the context is updated by subsequent taskcalls
-                if context.var_set_history:
-                    task.set_annotation(VARIABLES_SET_ANNOTATION_KEY, context.var_set_history.copy())
-                if context.var_use_history:
-                    task.set_annotation(VARIABLES_USED_ANNOTATION_KEY, context.var_use_history.copy())
-                
+                defined_vars = copy.deepcopy(context.var_set_history)
+                used_vars = copy.deepcopy(context.var_use_history)
+                task.set_annotation(VARIABLES_SET_ANNOTATION_KEY, defined_vars)
+                task.set_annotation(VARIABLES_USED_ANNOTATION_KEY, used_vars)
                 task.set_annotation(ARGUMENTS_ANNOTATION_KEY, arguments)
-        return
+
+                defined_vars_key_value = {k: v[0].value for k, v in defined_vars.items() if v and isinstance(v[0], Variable)}
+                used_vars_key_value = {}
+                for k, v in used_vars.items():
+                    if not v:
+                        continue
+                    if not isinstance(v[0], Variable):
+                        continue
+                    # skip loop value like "item"
+                    var_block = "{{ " + k + " }}"
+                    if is_loop_var(var_block, task):
+                        continue
+                    
+                    value = v[0].value
+                    if v[0].type == VariableType.Unknown:
+                        value = make_value_placeholder(k)
+                    used_vars_key_value[k] = value
+                    
+                obj_and_vars_list.append((obj, defined_vars_key_value, used_vars_key_value))
+        return obj_and_vars_list
 
     def _traverse(self, call_seq: list, resolve_value=False, set_annotation=False):
         defined_vars = {}

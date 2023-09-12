@@ -170,8 +170,8 @@ def get_task_sequence_for_taskfile(taskfile: TaskFile, project: SageProject):
 
 # embed `defined_vars` annotation to all objects in a call sequence
 def set_defined_vars(call_seq: list):
-    resolver = VariableResolver(call_seq=call_seq)
-    obj_and_vars_list = resolver.set_defined_vars()
+    resolver = VariableResolver()
+    obj_and_vars_list = resolver.set_defined_vars(call_seq=call_seq)
     call_seq = resolver.call_seq
     return obj_and_vars_list
 
@@ -187,8 +187,8 @@ def get_defined_vars(object: SageObject, project: SageProject):
             target = role
             obj_list = [role, object]
 
-    resolver = VariableResolver(call_seq=obj_list)
-    return resolver.get_defined_vars(object=target)
+    resolver = VariableResolver()
+    return resolver.get_defined_vars(object=target, call_seq=obj_list)
 
 # get used vars for the specified object
 # this returns a dict of var_name and var_value pairs, where values are resolved as much as possible
@@ -205,8 +205,8 @@ def get_used_vars(object: SageObject, project: SageProject):
         return {}
     
     target = obj_list[-1]
-    resolver = VariableResolver(call_seq=obj_list)
-    return resolver.get_used_vars(object=target)
+    resolver = VariableResolver()
+    return resolver.get_used_vars(object=target, call_seq=obj_list)
 
 
 def set_vars_annotation(object: SageObject, project: SageProject):
@@ -220,8 +220,8 @@ def set_vars_annotation(object: SageObject, project: SageProject):
     if not obj_list:
         return []
     
-    resolver = VariableResolver(call_seq=obj_list)
-    obj_vars_list = resolver.set_used_vars(set_annotation=True)
+    resolver = VariableResolver()
+    obj_vars_list = resolver.set_used_vars(call_seq=obj_list)
     obj_list = [obj for (obj, _, _) in obj_vars_list]
     return obj_list
 

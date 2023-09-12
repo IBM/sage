@@ -35,7 +35,7 @@ The data is useful to compute rich context information beyond single. For exampl
 The data can be accessed by rules at runtime, and the [data file](./doc/sample-findings.json) is exported as knowledge base file (ARI RAM file) for later use. 
 
 ```
-$ python sage/tools/view_findings.py -f /tmp/test-rabbitmq/sage_dir/findings.json -t role
+$ python sage_scan/tools/view_findings.py -f /tmp/test-rabbitmq/sage_dir/findings.json -t role
 Role ansible-rabbitmq
 ├── TaskFile tasks/config.yml
 │   ├── Task config | Configuring RabbitMQ
@@ -136,7 +136,7 @@ export ARI_KB_DATA_DIR=/Users/mue/Downloads/ram-all-20230613/
 
 3. do custom scan for the repository
 ```
-python sage/custom_scan/custom_scan.py \
+python sage_scan/custom_scan/custom_scan.py \
   -d /tmp/Ansible-OpenShift-Provisioning \
   -o /tmp/test/sage_dir
 ```
@@ -174,7 +174,7 @@ ftdata.json is generated.
 
 1. Do custom scan for all GitHub-RHIBM source with source json file.
 ```
-python sage/custom_scan/custom_scan_all.py \
+python sage_scan/custom_scan/custom_scan_all.py \
   -t GitHub-RHIBM \
   -s /tmp/RH_IBM_FT_data_GH_api.json \
   -o /tmp/batch
@@ -263,12 +263,12 @@ The scan report can be generated with the following command.
 ```
 # iterate for all sources.
 
-python sage/tools/object_report.py \
+python sage_scan/tools/object_report.py \
   -i batch/results \
   -t GitHub-AC 
   -o /tmp/sage-scan-report-test 
 
-python sage/tools/object_report.py \
+python sage_scan/tools/object_report.py \
   -i batch/results \
   -t GitHub-ME 
   -o /tmp/sage-scan-report-test 

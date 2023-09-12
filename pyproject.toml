@@ -3,7 +3,7 @@ requires = ["setuptools", "setuptools-scm"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "sage"
+name = "sage-scan"
 description = "My package description"
 readme = "README.rst"
 requires-python = ">=3.7"
@@ -21,11 +21,11 @@ dependencies = [
 dynamic = ["version"]
 
 [tool.setuptools.dynamic]
-version = {attr = "sage.__version__.__version__"}
+version = {attr = "sage_scan.__version__.__version__"}
 
 [tool.setuptools]
-py-modules = ["sage"]
-packages = ["sage"]
+py-modules = ["sage_scan"]
+packages = ["sage_scan"]
 
 [tool.black]
 line-length = 150

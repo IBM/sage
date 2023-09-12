@@ -14,10 +14,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from sage.models import SageObject, SageProject, Playbook, TaskFile, Play, Task, Role
-from sage.process.variable_resolver import VariableResolver
-from sage.process.knowledge_base import KnowledgeBase, MODULE_OBJECT_ANNOTATION_KEY
-from sage.process.annotations import (
+from sage_scan.models import SageObject, SageProject, Playbook, TaskFile, Play, Task, Role
+from sage_scan.process.variable_resolver import VariableResolver
+from sage_scan.process.knowledge_base import KnowledgeBase, MODULE_OBJECT_ANNOTATION_KEY
+from sage_scan.process.annotations import (
     set_module_spec_annotations,
     set_module_arg_key_annotations,
     set_module_arg_value_annotations,

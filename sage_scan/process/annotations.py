@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from sage.models import (
+from sage_scan.models import (
     Task,
     Module,
 )

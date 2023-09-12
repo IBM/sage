@@ -19,7 +19,7 @@
     - `OUTPUT_DIR` ... Path to the output directory. This will be created if it does not exist.
 
     ```
-    $ python sage/custom_scan/custom_scan.py -d <PATH/TO/PROJECT> -o <OUTPUT_DIR>
+    $ python sage_scan/custom_scan/custom_scan.py -d <PATH/TO/PROJECT> -o <OUTPUT_DIR>
     ```
 
 3. Confirm the output files
@@ -113,11 +113,11 @@
 
     `objects` are detail data of the task call tree. Each element is a call tree in the execution order and it is starting from callable unit in Ansible like playbook, role, and taskfile. You can use this data in order to traverse all the tasks found in the project and to add some data dependeing on your requirements.
 
-    We have [an example script](../../sage/tools/show_all_fqcn_from_result.py) which traverses all tasks and convert module short name to FQCN.
+    We have [an example script](../../sage_scan/tools/show_all_fqcn_from_result.py) which traverses all tasks and convert module short name to FQCN.
     You can learn how to use the `objects` data from the example.
 
     ```bash
-    $ python sage/tools/show_all_fqcn_from_result.py -f /sample_output/result.json
+    $ python sage_scan/tools/show_all_fqcn_from_result.py -f /sample_output/result.json
     SHORT_NAME    FQCN
     ------------  -----------------------
     debug         ansible.builtin.debug

@@ -25,8 +25,8 @@ from ansible_risk_insight.finder import (
     get_project_info_for_file,
 )
 from ansible_risk_insight.utils import escape_local_path
-from sage.utils import get_rule_id_list, get_git_version
-from sage.models import convert_to_sage_obj, SageProject
+from sage_scan.utils import get_rule_id_list, get_git_version
+from sage_scan.models import convert_to_sage_obj, SageProject
 import os
 import time
 import traceback

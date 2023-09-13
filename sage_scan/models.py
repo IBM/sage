@@ -654,3 +654,195 @@ def save_objects(fpath: str, sage_objects: SageObjects):
     with open(fpath, "w") as file:
         file.write("".join(lines))
     return
+
+
+@dataclass
+class PlaybookDataMetrics(object):
+    # each metric value should be initialized with None
+    # to clarify which value is computed or not
+    num_of_tasks: int = None
+    num_of_tasks_with_include_tasks: int = None
+    num_of_tasks_with_include_role: int = None
+    num_of_tasks_with_include_vars: int = None
+
+    num_of_plays: int = None
+    num_of_plays_with_vars: int = None
+    num_of_plays_with_roles: int = None
+    num_of_plays_with_import_playbook: int = None
+
+    is_self_contained: bool = None
+
+
+@dataclass
+class PlaybookData(object):
+    object: Playbook = None
+    project: SageProject = None
+
+    # attributes below are automatically set by __post_init__() 
+
+    # parent if any
+    collection: Collection = None
+    role: Role = None
+
+    # children / include targets
+    playbooks: list = field(default_factory=list)
+    plays: list = field(default_factory=list)
+    roles: list = field(default_factory=list)
+    taskfiles: list = field(default_factory=list)
+    tasks: list = field(default_factory=list)
+
+    call_seq: list = field(default_factory=list)
+
+    metrics: PlaybookDataMetrics = None
+
+    def __post_init__(self):
+        if not self.object:
+            return
+        
+        if not self.project:
+            return
+        
+        if self.object.collection:
+            for coll in self.project.collections:
+                if coll.fqcn == self.object.collection:
+                    self.collection = coll
+                    break
+
+        if self.object.role:
+            for role in self.project.roles:
+                if role.fqcn == self.object.role:
+                    self.role = role
+                    break
+
+        call_seq = self.project.get_call_sequence_by_entrypoint(self.object)
+        self.call_seq = call_seq
+
+        for obj in call_seq:
+            if isinstance(obj, Playbook):
+                self.playbooks.append(obj)
+            elif isinstance(obj, Play):
+                self.plays.append(obj)
+            elif isinstance(obj, Role):
+                self.roles.append(obj)
+            elif isinstance(obj, TaskFile):
+                self.taskfiles.append(obj)
+            elif isinstance(obj, Task):
+                self.tasks.append(obj)
+
+
+    def metrics_to_json(self):
+        data = {}
+        data["source"] = self.project.source
+        data["filepath"] = self.object.filepath
+        for k, v in self.metrics.__dict__.items():
+            data[k] = v
+        return json.dumps(data)
+
+    def compute_metrics(self):
+        metrics = PlaybookDataMetrics()
+        metrics.num_of_tasks = len(self.get_tasks_in_this_playbook())
+        metrics.num_of_tasks_with_include_tasks = len(self.get_tasks_with_include_tasks())
+        metrics.num_of_tasks_with_include_role = len(self.get_tasks_with_include_role())
+        metrics.num_of_tasks_with_include_vars = len(self.get_tasks_with_include_vars())
+        metrics.num_of_plays = len(self.get_plays_in_this_playbook())
+        metrics.num_of_plays_with_vars = len(self.get_plays_with_vars())
+        metrics.num_of_plays_with_roles = len(self.get_plays_with_roles())
+        metrics.num_of_plays_with_import_playbook = len(self.get_plays_with_import_playbook())
+        metrics.is_self_contained = self.is_self_contained()
+        self.metrics = metrics
+        return
+
+    def get_tasks_in_this_playbook(self):
+        return [t for t in self.tasks if t.filepath == self.object.filepath]
+
+    def get_tasks_with_include_tasks(self):
+        tasks_in_this_playbook = self.get_tasks_in_this_playbook()
+
+        target_modules = [
+            "import_tasks",
+            "include_tasks",
+            "include",
+            "ansible.builtin.import_tasks",
+            "ansible.builtin.include_tasks",
+            "ansible.builtin.include",
+        ]
+        tasks_with_include_tasks = [
+            t for t in tasks_in_this_playbook
+            if t.module in target_modules or 
+            t.get_annotation("module.correct_fqcn", "") in target_modules
+        ]
+        return tasks_with_include_tasks
+    
+    def get_tasks_with_include_role(self):
+        target_modules = [
+            "import_role",
+            "include_role",
+            "ansible.builtin.import_role",
+            "ansible.builtin.include_role",
+        ]
+        tasks_in_this_playbook = self.get_tasks_in_this_playbook()
+        tasks_with_include_role = [
+            t for t in tasks_in_this_playbook
+            if t.module in target_modules or 
+            t.get_annotation("module.correct_fqcn", "") in target_modules
+        ]
+        return tasks_with_include_role
+    
+    def get_tasks_with_include_vars(self):
+        target_modules = [
+            "include_vars",
+            "ansible.builtin.include_vars",
+        ]
+        tasks_in_this_playbook = self.get_tasks_in_this_playbook()
+        tasks_with_include_vars = [
+            t for t in tasks_in_this_playbook
+            if t.module in target_modules or 
+            t.get_annotation("module.correct_fqcn", "") in target_modules
+        ]
+        return tasks_with_include_vars
+
+    def get_plays_in_this_playbook(self):
+        return [p for p in self.plays if p.filepath == self.object.filepath]
+    
+    def get_plays_with_vars(self):
+        plays_in_this_playbook = self.get_plays_in_this_playbook()
+        plays_with_vars = [
+            p for p in plays_in_this_playbook
+            if p.variables
+        ]
+        return plays_with_vars
+
+    def get_plays_with_roles(self):
+        plays_in_this_playbook = self.get_plays_in_this_playbook()
+        plays_with_roles = [
+            p for p in plays_in_this_playbook
+            if p.roles
+        ]
+        return plays_with_roles
+    
+    def get_plays_with_import_playbook(self):
+        plays_in_this_playbook = self.get_plays_in_this_playbook()
+        plays_with_import_playbook = [
+            p for p in plays_in_this_playbook
+            if p.import_playbook
+        ]
+        return plays_with_import_playbook
+
+
+    def is_self_contained(self):
+        if self.get_plays_with_import_playbook():
+            return False
+        
+        if self.get_plays_with_roles():
+            return False
+        
+        if self.get_tasks_with_include_tasks():
+            return False
+        
+        if self.get_tasks_with_include_role():
+            return False
+        
+        if self.get_tasks_with_include_vars():
+            return False
+        
+        return True

@@ -13,8 +13,7 @@ COPY poetry.lock pyproject.toml ./
 RUN apt-get clean && apt-get update && \
     apt-get install -y sudo && \
     pip install -U pip && \
-    git config --global url."https://${GIT_ACCESS_TOKEN}@github.ibm.com".insteadOf "ssh://git@github.ibm.com" && \
-    pip install git+ssh://git@github.ibm.com/ansible-risk-insight/sage.git@bbecdf379c8b96ab4ac44ab4836fe01e04de796c && \
+    pip install git+https://github.com/IBM/sage.git@178ef128803bd63f54a11b0efb114dad047b558e && \
     curl -sSL https://install.python-poetry.org | python3 - && \
     poetry config virtualenvs.create false && \
     poetry install --no-dev

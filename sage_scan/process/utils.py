@@ -123,40 +123,40 @@ def find_parent_role(taskfile: TaskFile, project: SageProject):
 # get all call sequences found in the SageProject
 # call sequence is a sequence of objects executed by an entrypoint
 # e.g.) Playbook --> Play 1 -> Task 1a -> Task 1b -> Play 2 -> Task 2a 
-def get_all_call_sequences(project: SageProject):
-    return project.get_all_call_sequences()
+def get_all_call_sequences(project: SageProject, follow_include: bool=True):
+    return project.get_all_call_sequences(follow_include)
 
 
 # get a call sequence which contains the specified task
-def get_call_sequence_for_task(task: Task, project: SageProject):
-    return project.get_call_sequence_for_task(task)
+def get_call_sequence_for_task(task: Task, project: SageProject, follow_include: bool=True):
+    return project.get_call_sequence_for_task(task, follow_include)
 
 
 # get call sequence which starts from the specified entrypoint
-def get_call_sequence_by_entrypoint(entrypoint: Playbook|Role|TaskFile, project: SageProject):
-    return project.get_call_sequence_by_entrypoint(entrypoint)
+def get_call_sequence_by_entrypoint(entrypoint: Playbook|Role|TaskFile, project: SageProject, follow_include: bool=True):
+    return project.get_call_sequence_by_entrypoint(entrypoint, follow_include)
 
 
 # get task sequence which starts from the specified entrypoint
-def get_task_sequence_by_entrypoint(entrypoint: Playbook|Role|TaskFile, project: SageProject):
-    call_seq = get_call_sequence_by_entrypoint(entrypoint, project)
+def get_task_sequence_by_entrypoint(entrypoint: Playbook|Role|TaskFile, project: SageProject, follow_include: bool=True):
+    call_seq = get_call_sequence_by_entrypoint(entrypoint, project, follow_include)
     if not call_seq:
         return None
     return [obj for obj in call_seq if isinstance(obj, Task)]
 
 
 # get a task sequence which starts from the specified playbook
-def get_task_sequence_for_playbook(playbook: Playbook, project: SageProject):
-    return get_task_sequence_by_entrypoint(playbook, project)
+def get_task_sequence_for_playbook(playbook: Playbook, project: SageProject, follow_include: bool=True):
+    return get_task_sequence_by_entrypoint(playbook, project, follow_include)
 
 
 # get a task sequences which starts from the specified role
 # this returns a list of task sequences; each sequence starts from a single taskfile in the role
-def get_task_sequences_for_role(role: Role, project: SageProject):
+def get_task_sequences_for_role(role: Role, project: SageProject, follow_include: bool=True):
     taskfiles = get_taskfiles_in_role(role, project)
     task_seq_list = []
     for taskfile in taskfiles:
-        task_seq = get_task_sequence_by_entrypoint(taskfile, project)
+        task_seq = get_task_sequence_by_entrypoint(taskfile, project, follow_include)
         if not task_seq:
             continue
         task_seq_list.append(task_seq)
@@ -164,8 +164,8 @@ def get_task_sequences_for_role(role: Role, project: SageProject):
 
 
 # get a task sequences which starts from the specified taskfile
-def get_task_sequence_for_taskfile(taskfile: TaskFile, project: SageProject):
-    return get_task_sequence_by_entrypoint(taskfile, project)
+def get_task_sequence_for_taskfile(taskfile: TaskFile, project: SageProject, follow_include: bool=True):
+    return get_task_sequence_by_entrypoint(taskfile, project, follow_include)
 
 
 # embed `defined_vars` annotation to all objects in a call sequence

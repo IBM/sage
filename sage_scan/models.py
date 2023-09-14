@@ -460,30 +460,30 @@ class SageProject(object):
                     return obj
         return None
 
-    def get_all_call_sequences(self):
+    def get_all_call_sequences(self, follow_include: bool=True):
         found_taskfile_keys = set()
         all_call_sequences = []
         for p in self.playbooks:
-            call_graph = self._get_call_graph(obj=p)
+            call_graph = self._get_call_graph(obj=p, follow_include=follow_include)
             all_call_sequences.append(call_graph)
             tmp_taskfile_keys = set([obj.key for obj in call_graph if isinstance(obj, TaskFile)])
             found_taskfile_keys = found_taskfile_keys.union(tmp_taskfile_keys)
         for r in self.roles:
-            call_graph = self._get_call_graph(obj=r)
+            call_graph = self._get_call_graph(obj=r, follow_include=follow_include)
             all_call_sequences.append(call_graph)
             tmp_taskfile_keys = set([obj.key for obj in call_graph if isinstance(obj, TaskFile)])
             found_taskfile_keys = found_taskfile_keys.union(tmp_taskfile_keys)
         for tf in self.taskfiles:
             if tf.key in found_taskfile_keys:
                 continue
-            call_graph = self._get_call_graph(obj=tf)
+            call_graph = self._get_call_graph(obj=tf, follow_include=follow_include)
             all_call_sequences.append(call_graph)
         return all_call_sequences
     
     # NOTE: currently this returns only 1 sequence found first
-    def get_call_sequence_for_task(self, task: Task):
+    def get_call_sequence_for_task(self, task: Task, follow_include: bool=True):
         target_key = task.key
-        all_call_seqs = self.get_all_call_sequences()
+        all_call_seqs = self.get_all_call_sequences(follow_include=follow_include)
         found_seq = None
         for call_seq in all_call_seqs:
             keys_in_seq = [obj.key for obj in call_seq]
@@ -492,11 +492,11 @@ class SageProject(object):
                 break
         return found_seq
     
-    def get_call_sequence_by_entrypoint(self, entrypoint: Playbook|Role|TaskFile):
-        return self._get_call_graph(obj=entrypoint)
+    def get_call_sequence_by_entrypoint(self, entrypoint: Playbook|Role|TaskFile, follow_include: bool=True):
+        return self._get_call_graph(obj=entrypoint, follow_include=follow_include)
 
     # get call sequence which starts from the specified object (e.g. playbook -> play -> task)
-    def _get_call_graph(self, obj: SageObject=None, key: str=""):
+    def _get_call_graph(self, obj: SageObject=None, key: str="", follow_include: bool=True):
         if not obj and not key:
             raise ValueError("either `obj` or `key` must be non-empty value")
         
@@ -506,10 +506,10 @@ class SageProject(object):
                 raise ValueError(f"No object found for key `{key}`")
         
         history = []
-        return self._recursive_get_call_graph(obj, history)
+        return self._recursive_get_call_graph(obj=obj, history=history, follow_include=follow_include)
 
 
-    def _get_children_keys_for_graph(self, obj):
+    def _get_children_keys_for_graph(self, obj, follow_include: bool=True):
         if isinstance(obj, Playbook):
             return obj.plays
         elif isinstance(obj, Role):
@@ -524,23 +524,26 @@ class SageProject(object):
             return taskfile_key
         elif isinstance(obj, Play):
             roles = []
-            if obj.roles:
-                for rip in obj.roles:
-                    role_key = rip.role_info.get("key", None)
-                    if role_key:
-                        roles.append(role_key)
+            if follow_include:
+                if obj.roles:
+                    for rip in obj.roles:
+                    
+                        role_key = rip.role_info.get("key", None)
+                        if role_key:
+                            roles.append(role_key)
             return obj.pre_tasks + obj.tasks + roles + obj.post_tasks
         elif isinstance(obj, TaskFile):
             return obj.tasks
         elif isinstance(obj, Task):
-            if obj.include_info:
-                c_key = obj.include_info.get("key", None)
-                if c_key:
-                    return [c_key]
+            if follow_include:
+                if obj.include_info:
+                    c_key = obj.include_info.get("key", None)
+                    if c_key:
+                        return [c_key]
         
         return []
         
-    def _recursive_get_call_graph(self, obj, history=None):
+    def _recursive_get_call_graph(self, obj, history=None, follow_include: bool=True):
         if not history:
             history = []
         
@@ -552,14 +555,14 @@ class SageProject(object):
         _history.append(obj_key)
 
         call_graph = [obj]
-        children_keys = self._get_children_keys_for_graph(obj)
+        children_keys = self._get_children_keys_for_graph(obj=obj, follow_include=follow_include)
         if children_keys:
             for c_key in children_keys:
                 c_obj = self.get_object(c_key)
                 if not c_obj:
                     logger.warn(f"No object found for key `{c_key}`; skip this node")
                     continue
-                sub_graph = self._recursive_get_call_graph(c_obj, _history)
+                sub_graph = self._recursive_get_call_graph(obj=c_obj, history=_history, follow_include=follow_include)
                 call_graph.extend(sub_graph)
         return call_graph
     
@@ -654,3 +657,195 @@ def save_objects(fpath: str, sage_objects: SageObjects):
     with open(fpath, "w") as file:
         file.write("".join(lines))
     return
+
+
+@dataclass
+class PlaybookDataMetrics(object):
+    # each metric value should be initialized with None
+    # to clarify which value is computed or not
+    num_of_tasks: int = None
+    num_of_tasks_with_include_tasks: int = None
+    num_of_tasks_with_include_role: int = None
+    num_of_tasks_with_include_vars: int = None
+
+    num_of_plays: int = None
+    num_of_plays_with_vars: int = None
+    num_of_plays_with_roles: int = None
+    num_of_plays_with_import_playbook: int = None
+
+    is_self_contained: bool = None
+
+
+@dataclass
+class PlaybookData(object):
+    object: Playbook = None
+    project: SageProject = None
+
+    # attributes below are automatically set by __post_init__() 
+
+    # parent if any
+    collection: Collection = None
+    role: Role = None
+
+    # children / include targets
+    playbooks: list = field(default_factory=list)
+    plays: list = field(default_factory=list)
+    roles: list = field(default_factory=list)
+    taskfiles: list = field(default_factory=list)
+    tasks: list = field(default_factory=list)
+
+    call_seq: list = field(default_factory=list)
+
+    metrics: PlaybookDataMetrics = None
+
+    def __post_init__(self):
+        if not self.object:
+            return
+        
+        if not self.project:
+            return
+        
+        if self.object.collection:
+            for coll in self.project.collections:
+                if coll.fqcn == self.object.collection:
+                    self.collection = coll
+                    break
+
+        if self.object.role:
+            for role in self.project.roles:
+                if role.fqcn == self.object.role:
+                    self.role = role
+                    break
+
+        call_seq = self.project.get_call_sequence_by_entrypoint(self.object)
+        self.call_seq = call_seq
+
+        for obj in call_seq:
+            if isinstance(obj, Playbook):
+                self.playbooks.append(obj)
+            elif isinstance(obj, Play):
+                self.plays.append(obj)
+            elif isinstance(obj, Role):
+                self.roles.append(obj)
+            elif isinstance(obj, TaskFile):
+                self.taskfiles.append(obj)
+            elif isinstance(obj, Task):
+                self.tasks.append(obj)
+
+
+    def metrics_to_json(self):
+        data = {}
+        data["source"] = self.project.source
+        data["filepath"] = self.object.filepath
+        for k, v in self.metrics.__dict__.items():
+            data[k] = v
+        return json.dumps(data, separators=(',', ':'))
+
+    def compute_metrics(self):
+        metrics = PlaybookDataMetrics()
+        metrics.num_of_tasks = len(self.get_tasks_in_this_playbook())
+        metrics.num_of_tasks_with_include_tasks = len(self.get_tasks_with_include_tasks())
+        metrics.num_of_tasks_with_include_role = len(self.get_tasks_with_include_role())
+        metrics.num_of_tasks_with_include_vars = len(self.get_tasks_with_include_vars())
+        metrics.num_of_plays = len(self.get_plays_in_this_playbook())
+        metrics.num_of_plays_with_vars = len(self.get_plays_with_vars())
+        metrics.num_of_plays_with_roles = len(self.get_plays_with_roles())
+        metrics.num_of_plays_with_import_playbook = len(self.get_plays_with_import_playbook())
+        metrics.is_self_contained = self.is_self_contained()
+        self.metrics = metrics
+        return
+
+    def get_tasks_in_this_playbook(self):
+        return [t for t in self.tasks if t.filepath == self.object.filepath]
+
+    def get_tasks_with_include_tasks(self):
+        tasks_in_this_playbook = self.get_tasks_in_this_playbook()
+
+        target_modules = [
+            "import_tasks",
+            "include_tasks",
+            "include",
+            "ansible.builtin.import_tasks",
+            "ansible.builtin.include_tasks",
+            "ansible.builtin.include",
+        ]
+        tasks_with_include_tasks = [
+            t for t in tasks_in_this_playbook
+            if t.module in target_modules or 
+            t.get_annotation("module.correct_fqcn", "") in target_modules
+        ]
+        return tasks_with_include_tasks
+    
+    def get_tasks_with_include_role(self):
+        target_modules = [
+            "import_role",
+            "include_role",
+            "ansible.builtin.import_role",
+            "ansible.builtin.include_role",
+        ]
+        tasks_in_this_playbook = self.get_tasks_in_this_playbook()
+        tasks_with_include_role = [
+            t for t in tasks_in_this_playbook
+            if t.module in target_modules or 
+            t.get_annotation("module.correct_fqcn", "") in target_modules
+        ]
+        return tasks_with_include_role
+    
+    def get_tasks_with_include_vars(self):
+        target_modules = [
+            "include_vars",
+            "ansible.builtin.include_vars",
+        ]
+        tasks_in_this_playbook = self.get_tasks_in_this_playbook()
+        tasks_with_include_vars = [
+            t for t in tasks_in_this_playbook
+            if t.module in target_modules or 
+            t.get_annotation("module.correct_fqcn", "") in target_modules
+        ]
+        return tasks_with_include_vars
+
+    def get_plays_in_this_playbook(self):
+        return [p for p in self.plays if p.filepath == self.object.filepath]
+    
+    def get_plays_with_vars(self):
+        plays_in_this_playbook = self.get_plays_in_this_playbook()
+        plays_with_vars = [
+            p for p in plays_in_this_playbook
+            if p.variables
+        ]
+        return plays_with_vars
+
+    def get_plays_with_roles(self):
+        plays_in_this_playbook = self.get_plays_in_this_playbook()
+        plays_with_roles = [
+            p for p in plays_in_this_playbook
+            if p.roles
+        ]
+        return plays_with_roles
+    
+    def get_plays_with_import_playbook(self):
+        plays_in_this_playbook = self.get_plays_in_this_playbook()
+        plays_with_import_playbook = [
+            p for p in plays_in_this_playbook
+            if p.import_playbook
+        ]
+        return plays_with_import_playbook
+
+
+    def is_self_contained(self):
+        if self.get_plays_with_import_playbook():
+            return False
+        
+        if self.get_plays_with_roles():
+            return False
+        
+        if self.get_tasks_with_include_tasks():
+            return False
+        
+        if self.get_tasks_with_include_role():
+            return False
+        
+        if self.get_tasks_with_include_vars():
+            return False
+        
+        return True

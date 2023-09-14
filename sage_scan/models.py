@@ -460,30 +460,30 @@ class SageProject(object):
                     return obj
         return None
 
-    def get_all_call_sequences(self):
+    def get_all_call_sequences(self, follow_include: bool=True):
         found_taskfile_keys = set()
         all_call_sequences = []
         for p in self.playbooks:
-            call_graph = self._get_call_graph(obj=p)
+            call_graph = self._get_call_graph(obj=p, follow_include=follow_include)
             all_call_sequences.append(call_graph)
             tmp_taskfile_keys = set([obj.key for obj in call_graph if isinstance(obj, TaskFile)])
             found_taskfile_keys = found_taskfile_keys.union(tmp_taskfile_keys)
         for r in self.roles:
-            call_graph = self._get_call_graph(obj=r)
+            call_graph = self._get_call_graph(obj=r, follow_include=follow_include)
             all_call_sequences.append(call_graph)
             tmp_taskfile_keys = set([obj.key for obj in call_graph if isinstance(obj, TaskFile)])
             found_taskfile_keys = found_taskfile_keys.union(tmp_taskfile_keys)
         for tf in self.taskfiles:
             if tf.key in found_taskfile_keys:
                 continue
-            call_graph = self._get_call_graph(obj=tf)
+            call_graph = self._get_call_graph(obj=tf, follow_include=follow_include)
             all_call_sequences.append(call_graph)
         return all_call_sequences
     
     # NOTE: currently this returns only 1 sequence found first
-    def get_call_sequence_for_task(self, task: Task):
+    def get_call_sequence_for_task(self, task: Task, follow_include: bool=True):
         target_key = task.key
-        all_call_seqs = self.get_all_call_sequences()
+        all_call_seqs = self.get_all_call_sequences(follow_include=follow_include)
         found_seq = None
         for call_seq in all_call_seqs:
             keys_in_seq = [obj.key for obj in call_seq]
@@ -492,11 +492,11 @@ class SageProject(object):
                 break
         return found_seq
     
-    def get_call_sequence_by_entrypoint(self, entrypoint: Playbook|Role|TaskFile):
-        return self._get_call_graph(obj=entrypoint)
+    def get_call_sequence_by_entrypoint(self, entrypoint: Playbook|Role|TaskFile, follow_include: bool=True):
+        return self._get_call_graph(obj=entrypoint, follow_include=follow_include)
 
     # get call sequence which starts from the specified object (e.g. playbook -> play -> task)
-    def _get_call_graph(self, obj: SageObject=None, key: str=""):
+    def _get_call_graph(self, obj: SageObject=None, key: str="", follow_include: bool=True):
         if not obj and not key:
             raise ValueError("either `obj` or `key` must be non-empty value")
         
@@ -506,10 +506,10 @@ class SageProject(object):
                 raise ValueError(f"No object found for key `{key}`")
         
         history = []
-        return self._recursive_get_call_graph(obj, history)
+        return self._recursive_get_call_graph(obj=obj, history=history, follow_include=follow_include)
 
 
-    def _get_children_keys_for_graph(self, obj):
+    def _get_children_keys_for_graph(self, obj, follow_include: bool=True):
         if isinstance(obj, Playbook):
             return obj.plays
         elif isinstance(obj, Role):
@@ -524,23 +524,26 @@ class SageProject(object):
             return taskfile_key
         elif isinstance(obj, Play):
             roles = []
-            if obj.roles:
-                for rip in obj.roles:
-                    role_key = rip.role_info.get("key", None)
-                    if role_key:
-                        roles.append(role_key)
+            if follow_include:
+                if obj.roles:
+                    for rip in obj.roles:
+                    
+                        role_key = rip.role_info.get("key", None)
+                        if role_key:
+                            roles.append(role_key)
             return obj.pre_tasks + obj.tasks + roles + obj.post_tasks
         elif isinstance(obj, TaskFile):
             return obj.tasks
         elif isinstance(obj, Task):
-            if obj.include_info:
-                c_key = obj.include_info.get("key", None)
-                if c_key:
-                    return [c_key]
+            if follow_include:
+                if obj.include_info:
+                    c_key = obj.include_info.get("key", None)
+                    if c_key:
+                        return [c_key]
         
         return []
         
-    def _recursive_get_call_graph(self, obj, history=None):
+    def _recursive_get_call_graph(self, obj, history=None, follow_include: bool=True):
         if not history:
             history = []
         
@@ -552,14 +555,14 @@ class SageProject(object):
         _history.append(obj_key)
 
         call_graph = [obj]
-        children_keys = self._get_children_keys_for_graph(obj)
+        children_keys = self._get_children_keys_for_graph(obj=obj, follow_include=follow_include)
         if children_keys:
             for c_key in children_keys:
                 c_obj = self.get_object(c_key)
                 if not c_obj:
                     logger.warn(f"No object found for key `{c_key}`; skip this node")
                     continue
-                sub_graph = self._recursive_get_call_graph(c_obj, _history)
+                sub_graph = self._recursive_get_call_graph(obj=c_obj, history=_history, follow_include=follow_include)
                 call_graph.extend(sub_graph)
         return call_graph
     
@@ -736,7 +739,7 @@ class PlaybookData(object):
         data["filepath"] = self.object.filepath
         for k, v in self.metrics.__dict__.items():
             data[k] = v
-        return json.dumps(data)
+        return json.dumps(data, separators=(',', ':'))
 
     def compute_metrics(self):
         metrics = PlaybookDataMetrics()

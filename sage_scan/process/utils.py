@@ -14,6 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
+
 from sage_scan.models import SageObject, SageProject, Playbook, TaskFile, Play, Task, Role
 from sage_scan.process.variable_resolver import VariableResolver
 from sage_scan.process.knowledge_base import KnowledgeBase, MODULE_OBJECT_ANNOTATION_KEY
@@ -109,6 +111,16 @@ def get_taskfiles_in_role(role: Role, project: SageProject):
             continue
         taskfiles.append(taskfile)
     return taskfiles
+
+
+# find main.yml or main.yaml in the specified role from SageProject
+def get_main_taskfile_for_role(role: Role, project: SageProject):
+    taskfiles = get_taskfiles_in_role(role, project)
+    for tf in taskfiles:
+        filename = os.path.basename(tf.filepath)
+        if filename in ["main.yml", "main.yaml"]:
+            return tf
+    return None
 
 
 # find a parent role for the specified taskfile if it exists

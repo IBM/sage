@@ -45,7 +45,16 @@ class DataMetrics(object):
     num_of_plays_with_roles: int = None
     num_of_plays_with_import_playbook: int = None
 
-    num_of_used_vars_defined_outside: int = None
+    # count num of plays that contain at least 1 task with include_xxx
+    num_of_plays_with_include_tasks: int = None
+    num_of_plays_with_include_role: int = None
+    num_of_plays_with_include_vars: int = None
+
+    num_of_used_vars: int = None
+    num_of_used_vars_locally_defined: int = None
+    num_of_used_vars_locally_undefined: int = None
+    num_of_used_vars_externally_defined: int = None
+    num_of_used_vars_unknown: int = None
 
     is_self_contained: bool = None
 
@@ -69,6 +78,8 @@ class PlaybookData(object):
     tasks: list = field(default_factory=list)
 
     call_seq: list = field(default_factory=list)
+     # initialize this with None to clarify whether it is already computed or not
+    used_vars: dict = None
 
     metrics: DataMetrics = field(default_factory=DataMetrics)
 
@@ -125,9 +136,19 @@ class PlaybookData(object):
         self.metrics.num_of_plays_with_vars = len(self.get_plays_with_vars())
         self.metrics.num_of_plays_with_roles = len(self.get_plays_with_roles())
         self.metrics.num_of_plays_with_import_playbook = len(self.get_plays_with_import_playbook())
+
+        self.metrics.num_of_plays_with_include_tasks = len(self.get_plays_with_include_tasks())
+        self.metrics.num_of_plays_with_include_role = len(self.get_plays_with_include_role())
+        self.metrics.num_of_plays_with_include_vars = len(self.get_plays_with_include_vars())
+
+        self.metrics.num_of_used_vars = len(self.get_used_vars())
+        self.metrics.num_of_used_vars_locally_defined = len(self.get_used_vars_locally_defined())
+        self.metrics.num_of_used_vars_locally_undefined = len(self.get_used_vars_locally_undefined())
+        self.metrics.num_of_used_vars_externally_defined = len(self.get_used_vars_externally_defined())
+        self.metrics.num_of_used_vars_unknown = len(self.get_used_vars_unknown())
+
         self.metrics.is_self_contained = self.is_self_contained()
 
-        self.metrics.num_of_used_vars_defined_outside = 0
         return
 
     def get_tasks_in_this_playbook(self):
@@ -205,7 +226,152 @@ class PlaybookData(object):
             if p.import_playbook
         ]
         return plays_with_import_playbook
+    
+    def get_plays_with_include_tasks(self):
+        target_modules = [
+            "import_tasks",
+            "include_tasks",
+            "include",
+            "ansible.builtin.import_tasks",
+            "ansible.builtin.include_tasks",
+            "ansible.builtin.include",
+        ]
+        return self.get_plays_with_specifed_modules(target_module_names=target_modules)
+    
+    def get_plays_with_include_role(self):
+        target_modules = [
+            "import_role",
+            "include_role",
+            "ansible.builtin.import_role",
+            "ansible.builtin.include_role",
+        ]
+        return self.get_plays_with_specifed_modules(target_module_names=target_modules)
+    
+    def get_plays_with_include_vars(self):
+        target_modules = [
+            "include_vars",
+            "ansible.builtin.include_vars",
+        ]
+        return self.get_plays_with_specifed_modules(target_module_names=target_modules)
 
+    
+    def get_plays_with_specifed_modules(self, target_module_names: list=[]):
+        plays_in_this_playbook = self.get_plays_in_this_playbook()
+        matched_plays = []
+        for p in plays_in_this_playbook:
+            task_keys = []
+            task_keys.extend(p.pre_tasks)
+            task_keys.extend(p.tasks)
+            task_keys.extend(p.post_tasks)
+            matched = False
+            for t in self.tasks:
+                if not isinstance(t, Task):
+                    continue
+                if t.key not in task_keys:
+                    continue
+                module_name = ""
+                if t.module_info and isinstance(t.module_info, dict):
+                    module_name = t.module_info.get("fqcn", "")
+                if t.annotations:
+                    if not module_name:
+                        module_name = t.annotations.get("correct_fqcn", "")
+                if not module_name:
+                    module_name = t.module
+
+                if not module_name:
+                    continue
+
+                if module_name in target_module_names:
+                    matched = True
+                    break
+
+                module_short_name = module_name
+                if "." in module_short_name:
+                    module_short_name = module_short_name.split(".")[-1]
+
+                if module_short_name in target_module_names:
+                    matched = True
+                    break
+            if matched:
+                matched_plays.append(p)
+        return matched_plays
+
+    def get_used_vars(self):
+        if self.used_vars is not None:
+            return self.used_vars
+        used_vars = get_used_vars(object=self.object, project=self.project)
+        self.used_vars = used_vars
+        return used_vars
+    
+    def get_used_vars_locally_defined(self):
+        used_vars = self.get_used_vars(object=self.object, project=self.project)
+        defined_vars_inside = {}
+        tasks_in_this_palybook = self.get_tasks_in_this_playbook()
+        for t in tasks_in_this_palybook:
+            if not isinstance(t, Task):
+                continue
+            if t.variables:
+                defined_vars_inside.update(t.variables)
+            if t.set_facts:
+                defined_vars_inside.update(t.set_facts)
+            if t.registered_variables:
+                defined_vars_inside.update(t.registered_variables)
+        used_vars_locally_defined = {}
+        for used_var_name in used_vars:
+            defined_inside = False
+            for defined_var_name in defined_vars_inside:
+                if used_var_name == defined_var_name:
+                    defined_inside = True
+                    break
+                prefix = defined_var_name + "."
+                if used_var_name.startswith(prefix):
+                    defined_inside = True
+                    break
+            if defined_inside:
+                used_vars_locally_defined[used_var_name] = used_vars[used_var_name]
+        return used_vars_locally_defined
+    
+    def get_used_vars_locally_undefined(self):
+        used_vars = self.get_used_vars(object=self.object, project=self.project)
+        used_vars_locally_defined = self.get_used_vars_locally_defined()
+        used_vars_locally_undefined = {}
+        for used_var_name in used_vars:
+            if used_var_name in used_vars_locally_defined:
+                continue
+            used_vars_locally_undefined[used_var_name] = used_vars[used_var_name]
+        return used_vars_locally_undefined
+    
+    def get_used_vars_externally_defined(self):
+        if not self.role:
+            return {}
+        role_vars = {}
+        role_vars.update(self.role.default_variables)
+        role_vars.update(self.role.variables)
+        used_vars_locally_undefined = self.get_used_vars_locally_undefined(object=self.object, project=self.project)
+        used_vars_externally_defined = {}
+        for used_var_name in used_vars_locally_undefined:
+            defined_outside = False
+            for defined_var_name in role_vars:
+                if used_var_name == defined_var_name:
+                    defined_outside = True
+                    break
+                prefix = defined_var_name + "."
+                if used_var_name.startswith(prefix):
+                    defined_outside = True
+                    break
+            if defined_outside:
+                used_vars_externally_defined[used_var_name] = used_vars_locally_undefined[used_var_name]
+        return used_vars_externally_defined
+    
+    def get_used_vars_unknown(self):
+        used_vars_locally_undefined = self.get_used_vars_locally_undefined(object=self.object, project=self.project)
+        used_vars_externally_defined = self.get_used_vars_externally_defined()
+        used_vars_unknown = {}
+        for used_var_name in used_vars_locally_undefined:
+            if used_var_name in used_vars_externally_defined:
+                continue
+            used_vars_unknown[used_var_name] = used_vars_locally_undefined[used_var_name]
+        return used_vars_unknown
 
     def is_self_contained(self):
         if self.metrics.num_of_plays_with_import_playbook is None:
@@ -233,6 +399,11 @@ class PlaybookData(object):
         if self.metrics.num_of_tasks_with_include_vars:
             return False
         
+        if self.metrics.num_of_used_vars_locally_undefined is None:
+            self.metrics.num_of_used_vars_locally_undefined = len(self.get_used_vars_locally_undefined())
+        if self.metrics.num_of_used_vars_locally_undefined:
+            return False
+        
         return True
 
 
@@ -253,6 +424,8 @@ class TaskFileData(object):
     tasks: list = field(default_factory=list)
 
     call_seq: list = field(default_factory=list)
+    # initialize this with None to clarify whether it is already computed or not
+    used_vars: dict = None
 
     metrics: DataMetrics = field(default_factory=DataMetrics)
 
@@ -300,13 +473,24 @@ class TaskFileData(object):
         self.metrics.num_of_tasks_with_include_tasks = len(self.get_tasks_with_include_tasks())
         self.metrics.num_of_tasks_with_include_role = len(self.get_tasks_with_include_role())
         self.metrics.num_of_tasks_with_include_vars = len(self.get_tasks_with_include_vars())
-        self.metrics.num_of_used_vars_defined_outside = len(self.get_used_vars_defined_outside())
-        self.metrics.is_self_contained = self.is_self_contained()
 
+        # always set 0 to `num_of_plays_xxx` for taskfile
         self.metrics.num_of_plays = 0
         self.metrics.num_of_plays_with_import_playbook = 0
         self.metrics.num_of_plays_with_roles = 0
         self.metrics.num_of_plays_with_vars = 0
+        self.metrics.num_of_plays_with_include_tasks = 0
+        self.metrics.num_of_plays_with_include_role = 0
+        self.metrics.num_of_plays_with_include_vars = 0
+
+        self.metrics.num_of_used_vars = len(self.get_used_vars())
+        self.metrics.num_of_used_vars_locally_defined = len(self.get_used_vars_locally_defined())
+        self.metrics.num_of_used_vars_locally_undefined = len(self.get_used_vars_locally_undefined())
+        self.metrics.num_of_used_vars_externally_defined = len(self.get_used_vars_externally_defined())
+        self.metrics.num_of_used_vars_unknown = len(self.get_used_vars_unknown())
+
+        self.metrics.is_self_contained = self.is_self_contained()
+
         return
 
     def get_tasks_in_this_taskfile(self):
@@ -358,8 +542,15 @@ class TaskFileData(object):
         ]
         return tasks_with_include_vars
     
-    def get_used_vars_defined_outside(self):
+    def get_used_vars(self):
+        if self.used_vars is not None:
+            return self.used_vars
         used_vars = get_used_vars(object=self.object, project=self.project)
+        self.used_vars = used_vars
+        return used_vars
+    
+    def get_used_vars_locally_defined(self):
+        used_vars = self.get_used_vars(object=self.object, project=self.project)
         defined_vars_inside = {}
         tasks_in_this_taskfile = self.get_tasks_in_this_taskfile()
         for t in tasks_in_this_taskfile:
@@ -371,7 +562,7 @@ class TaskFileData(object):
                 defined_vars_inside.update(t.set_facts)
             if t.registered_variables:
                 defined_vars_inside.update(t.registered_variables)
-        used_vars_defined_outside = {}
+        used_vars_locally_defined = {}
         for used_var_name in used_vars:
             defined_inside = False
             for defined_var_name in defined_vars_inside:
@@ -382,11 +573,66 @@ class TaskFileData(object):
                 if used_var_name.startswith(prefix):
                     defined_inside = True
                     break
-            if not defined_inside:
-                used_vars_defined_outside[used_var_name] = used_vars[used_var_name]
-        return used_vars_defined_outside
+            if defined_inside:
+                used_vars_locally_defined[used_var_name] = used_vars[used_var_name]
+        return used_vars_locally_defined
+    
+    def get_used_vars_locally_undefined(self):
+        used_vars = self.get_used_vars(object=self.object, project=self.project)
+        used_vars_locally_defined = self.get_used_vars_locally_defined()
+        used_vars_locally_undefined = {}
+        for used_var_name in used_vars:
+            if used_var_name in used_vars_locally_defined:
+                continue
+            used_vars_locally_undefined[used_var_name] = used_vars[used_var_name]
+        return used_vars_locally_undefined
+    
+    def get_used_vars_externally_defined(self):
+        if not self.role:
+            return {}
+        role_vars = {}
+        role_vars.update(self.role.default_variables)
+        role_vars.update(self.role.variables)
+        used_vars_locally_undefined = self.get_used_vars_locally_undefined(object=self.object, project=self.project)
+        used_vars_externally_defined = {}
+        for used_var_name in used_vars_locally_undefined:
+            defined_outside = False
+            for defined_var_name in role_vars:
+                if used_var_name == defined_var_name:
+                    defined_outside = True
+                    break
+                prefix = defined_var_name + "."
+                if used_var_name.startswith(prefix):
+                    defined_outside = True
+                    break
+            if defined_outside:
+                used_vars_externally_defined[used_var_name] = used_vars_locally_undefined[used_var_name]
+        return used_vars_externally_defined
+    
+    def get_used_vars_unknown(self):
+        used_vars_locally_undefined = self.get_used_vars_locally_undefined(object=self.object, project=self.project)
+        used_vars_externally_defined = self.get_used_vars_externally_defined()
+        used_vars_unknown = {}
+        for used_var_name in used_vars_locally_undefined:
+            if used_var_name in used_vars_externally_defined:
+                continue
+            used_vars_unknown[used_var_name] = used_vars_locally_undefined[used_var_name]
+        return used_vars_unknown
 
     def is_self_contained(self):
+
+        # Skip the following "num_of_plays_xxx" conditions because a taskfile has no plays always
+
+        # if self.metrics.num_of_plays_with_import_playbook is None:
+        #     self.metrics.num_of_plays_with_import_playbook = len(self.get_plays_with_import_playbook())
+        # if self.metrics.num_of_plays_with_import_playbook:
+        #     return False
+
+        # if self.metrics.num_of_plays_with_roles is None:
+        #     self.metrics.num_of_plays_with_roles = len(self.get_plays_with_roles())
+        # if self.metrics.num_of_plays_with_roles:
+        #     return False
+        
         if self.metrics.num_of_tasks_with_include_tasks is None:
             self.metrics.num_of_tasks_with_include_tasks = len(self.get_tasks_with_include_tasks())
         if self.metrics.num_of_tasks_with_include_tasks:
@@ -402,9 +648,9 @@ class TaskFileData(object):
         if self.metrics.num_of_tasks_with_include_vars:
             return False
 
-        if self.metrics.num_of_used_vars_defined_outside is None:
-            self.metrics.num_of_used_vars_defined_outside = len(self.get_used_vars_defined_outside())
-        if self.metrics.num_of_used_vars_defined_outside:
+        if self.metrics.num_of_used_vars_locally_undefined is None:
+            self.metrics.num_of_used_vars_locally_undefined = len(self.get_used_vars_locally_undefined())
+        if self.metrics.num_of_used_vars_locally_undefined:
             return False
         
         return True

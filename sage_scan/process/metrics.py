@@ -304,7 +304,7 @@ class PlaybookData(object):
         return used_vars
     
     def get_used_vars_locally_defined(self):
-        used_vars = self.get_used_vars(object=self.object, project=self.project)
+        used_vars = self.get_used_vars()
         defined_vars_inside = {}
         tasks_in_this_palybook = self.get_tasks_in_this_playbook()
         for t in tasks_in_this_palybook:
@@ -332,7 +332,7 @@ class PlaybookData(object):
         return used_vars_locally_defined
     
     def get_used_vars_locally_undefined(self):
-        used_vars = self.get_used_vars(object=self.object, project=self.project)
+        used_vars = self.get_used_vars()
         used_vars_locally_defined = self.get_used_vars_locally_defined()
         used_vars_locally_undefined = {}
         for used_var_name in used_vars:
@@ -550,7 +550,7 @@ class TaskFileData(object):
         return used_vars
     
     def get_used_vars_locally_defined(self):
-        used_vars = self.get_used_vars(object=self.object, project=self.project)
+        used_vars = self.get_used_vars()
         defined_vars_inside = {}
         tasks_in_this_taskfile = self.get_tasks_in_this_taskfile()
         for t in tasks_in_this_taskfile:
@@ -578,7 +578,7 @@ class TaskFileData(object):
         return used_vars_locally_defined
     
     def get_used_vars_locally_undefined(self):
-        used_vars = self.get_used_vars(object=self.object, project=self.project)
+        used_vars = self.get_used_vars()
         used_vars_locally_defined = self.get_used_vars_locally_defined()
         used_vars_locally_undefined = {}
         for used_var_name in used_vars:

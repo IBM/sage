@@ -690,6 +690,8 @@ class PlaybookData(object):
     used_vars: dict = None
     follow_include_for_used_vars: bool = True
 
+    metrics: DataMetrics = field(default_factory=DataMetrics)
+
     def __post_init__(self):
         if not self.object:
             return

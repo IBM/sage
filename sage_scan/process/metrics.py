@@ -80,6 +80,7 @@ class PlaybookData(object):
     call_seq: list = field(default_factory=list)
      # initialize this with None to clarify whether it is already computed or not
     used_vars: dict = None
+    follow_include_for_used_vars: bool = True
 
     metrics: DataMetrics = field(default_factory=DataMetrics)
 
@@ -299,7 +300,11 @@ class PlaybookData(object):
     def get_used_vars(self):
         if self.used_vars is not None:
             return self.used_vars
-        used_vars = get_used_vars(object=self.object, project=self.project)
+        used_vars = get_used_vars(
+            object=self.object,
+            project=self.project,
+            follow_include=self.follow_include_for_used_vars
+        )
         self.used_vars = used_vars
         return used_vars
     
@@ -426,6 +431,7 @@ class TaskFileData(object):
     call_seq: list = field(default_factory=list)
     # initialize this with None to clarify whether it is already computed or not
     used_vars: dict = None
+    follow_include_for_used_vars: bool = True
 
     metrics: DataMetrics = field(default_factory=DataMetrics)
 
@@ -545,7 +551,11 @@ class TaskFileData(object):
     def get_used_vars(self):
         if self.used_vars is not None:
             return self.used_vars
-        used_vars = get_used_vars(object=self.object, project=self.project)
+        used_vars = get_used_vars(
+            object=self.object,
+            project=self.project,
+            follow_include=self.follow_include_for_used_vars
+        )
         self.used_vars = used_vars
         return used_vars
     

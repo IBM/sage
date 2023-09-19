@@ -205,17 +205,21 @@ def get_defined_vars(object: SageObject, project: SageProject):
 # get used vars for the specified object
 # this returns a dict of var_name and var_value pairs, where values are resolved as much as possible
 # if variable resolution fails, the value will be a placeholder string like `{{ var_name }}`
-def get_used_vars(object: SageObject, project: SageProject):
+def get_used_vars(object: SageObject, project: SageProject, follow_include: bool=True):
     obj_list = []
     if isinstance(object, TaskFile):
         role = find_parent_role(object, project)
         if role:
             obj_list = [role]
-    call_seq = get_call_sequence_by_entrypoint(entrypoint=object, project=project)
+    call_seq = get_call_sequence_by_entrypoint(
+        entrypoint=object,
+        project=project,
+        follow_include=follow_include,
+    )
     obj_list.extend(call_seq)
     if not obj_list:
         return {}
-    
+
     target = obj_list[-1]
     resolver = VariableResolver()
     return resolver.get_used_vars(object=target, call_seq=obj_list)

@@ -191,6 +191,12 @@ class VariableResolver(object):
                     used_vars_key_value[k] = value
                     
                 obj_and_vars_list.append((obj, defined_vars_key_value, used_vars_key_value))
+            else:
+                last_defined = {}
+                last_used = {}
+                if obj_and_vars_list:
+                    _, last_defined, last_used = obj_and_vars_list[-1]
+                obj_and_vars_list.append((obj, last_defined, last_used))
         return obj_and_vars_list
 
 

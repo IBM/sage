@@ -14,6 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 from sage_scan.models import SageObject, SageProject, Playbook, TaskFile, Play, Task, Role
 from sage_scan.process.variable_resolver import VariableResolver
 from sage_scan.process.knowledge_base import KnowledgeBase, MODULE_OBJECT_ANNOTATION_KEY
@@ -111,6 +112,16 @@ def get_taskfiles_in_role(role: Role, project: SageProject):
     return taskfiles
 
 
+# find main.yml or main.yaml in the specified role from SageProject
+def get_main_taskfile_for_role(role: Role, project: SageProject):
+    taskfiles = get_taskfiles_in_role(role, project)
+    for tf in taskfiles:
+        filename = os.path.basename(tf.filepath)
+        if filename in ["main.yml", "main.yaml"]:
+            return tf
+    return None
+
+
 # find a parent role for the specified taskfile if it exists
 def find_parent_role(taskfile: TaskFile, project: SageProject):
     for role in project.roles:
@@ -193,13 +204,17 @@ def get_defined_vars(object: SageObject, project: SageProject):
 # get used vars for the specified object
 # this returns a dict of var_name and var_value pairs, where values are resolved as much as possible
 # if variable resolution fails, the value will be a placeholder string like `{{ var_name }}`
-def get_used_vars(object: SageObject, project: SageProject):
+def get_used_vars(object: SageObject, project: SageProject, follow_include: bool=True):
     obj_list = []
     if isinstance(object, TaskFile):
         role = find_parent_role(object, project)
         if role:
             obj_list = [role]
-    call_seq = get_call_sequence_by_entrypoint(entrypoint=object, project=project)
+    call_seq = get_call_sequence_by_entrypoint(
+        entrypoint=object,
+        project=project,
+        follow_include=follow_include,
+    )
     obj_list.extend(call_seq)
     if not obj_list:
         return {}

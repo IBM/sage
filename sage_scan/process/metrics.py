@@ -347,7 +347,7 @@ class PlaybookData(object):
         role_vars = {}
         role_vars.update(self.role.default_variables)
         role_vars.update(self.role.variables)
-        used_vars_locally_undefined = self.get_used_vars_locally_undefined(object=self.object, project=self.project)
+        used_vars_locally_undefined = self.get_used_vars_locally_undefined()
         used_vars_externally_defined = {}
         for used_var_name in used_vars_locally_undefined:
             defined_outside = False
@@ -364,7 +364,7 @@ class PlaybookData(object):
         return used_vars_externally_defined
     
     def get_used_vars_unknown(self):
-        used_vars_locally_undefined = self.get_used_vars_locally_undefined(object=self.object, project=self.project)
+        used_vars_locally_undefined = self.get_used_vars_locally_undefined()
         used_vars_externally_defined = self.get_used_vars_externally_defined()
         used_vars_unknown = {}
         for used_var_name in used_vars_locally_undefined:
@@ -593,7 +593,7 @@ class TaskFileData(object):
         role_vars = {}
         role_vars.update(self.role.default_variables)
         role_vars.update(self.role.variables)
-        used_vars_locally_undefined = self.get_used_vars_locally_undefined(object=self.object, project=self.project)
+        used_vars_locally_undefined = self.get_used_vars_locally_undefined()
         used_vars_externally_defined = {}
         for used_var_name in used_vars_locally_undefined:
             defined_outside = False
@@ -610,7 +610,7 @@ class TaskFileData(object):
         return used_vars_externally_defined
     
     def get_used_vars_unknown(self):
-        used_vars_locally_undefined = self.get_used_vars_locally_undefined(object=self.object, project=self.project)
+        used_vars_locally_undefined = self.get_used_vars_locally_undefined()
         used_vars_externally_defined = self.get_used_vars_externally_defined()
         used_vars_unknown = {}
         for used_var_name in used_vars_locally_undefined:

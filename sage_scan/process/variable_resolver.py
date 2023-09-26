@@ -82,20 +82,6 @@ class VariableResolver(object):
         obj_and_vars_list = self.traverse(call_seq=call_seq)
         return obj_and_vars_list
 
-    def update_defined_vars(self, vars_dict, variables, precedence):
-        if not variables:
-            return
-        if not isinstance(variables, dict):
-            return
-        for key, value in variables.items():
-            if key in vars_dict:
-                current_precedence = vars_dict[key][1]
-                if precedence >= current_precedence:
-                    vars_dict[key] = (value, precedence)
-            else:
-                vars_dict[key] = (value, precedence)
-        return
-
     def traverse(self, call_seq: list):
         context = VariableContext()
         obj_and_vars_list = []
@@ -173,78 +159,50 @@ class VariableResolver(object):
                 for k, v in used_vars.items():
                     if not v:
                         continue
-                    if not isinstance(v[0], Variable):
+                    _var = v[0]
+                    if not isinstance(_var, Variable):
                         continue
-                    # skip loop value like "item"
+
+                    # skip if this var is registered one
+                    parent_var_name = _var.name
+                    if "." in parent_var_name:
+                        parent_var_name = parent_var_name.split(".")[0]
+                    is_registered_var = False
+                    for p, q in defined_vars.items():
+                        if not q:
+                            continue
+                        _var_q = q[0]
+                        if not isinstance(_var_q, Variable):
+                            continue
+                        if _var_q.name == parent_var_name and _var_q.type == VariableType.RegisteredVars:
+                            is_registered_var = True
+                            break
+                    if is_registered_var:
+                        continue
+
+                    # skip loop var by type
+                    if _var.type == VariableType.LoopVars:
+                        continue
+
+                    # skip loop var by name
+                    # (this may be removed in the future because the type check above could be enough)
                     var_block = "{{ " + k + " }}"
                     if is_loop_var(var_block, task):
                         continue
                     
-                    value = v[0].value
-                    if v[0].type == VariableType.Unknown:
+                    value = _var.value
+                    if _var.type == VariableType.Unknown:
                         value = make_value_placeholder(k)
                     used_vars_key_value[k] = value
                     
                 obj_and_vars_list.append((obj, defined_vars_key_value, used_vars_key_value))
+            else:
+                last_defined = {}
+                last_used = {}
+                if obj_and_vars_list:
+                    _, last_defined, last_used = obj_and_vars_list[-1]
+                obj_and_vars_list.append((obj, last_defined, last_used))
         return obj_and_vars_list
-
-    def _traverse(self, call_seq: list, resolve_value=False, set_annotation=False):
-        defined_vars = {}
-        registered_vars = {}
-        used_vars = {}
-        obj_and_vars_list = []
-        for obj in call_seq:
-            # defined variables
-            if isinstance(obj, Playbook):
-                self.update_defined_vars(defined_vars, obj.variables, VariableType.PlaybookGroupVarsAll)
-            elif isinstance(obj, Play):
-                self.update_defined_vars(defined_vars, obj.variables, VariableType.PlayVars)
-            elif isinstance(obj, Role):
-                self.update_defined_vars(defined_vars, obj.default_variables, VariableType.RoleDefaults)
-                self.update_defined_vars(defined_vars, obj.variables, VariableType.RoleVars)
-            elif isinstance(obj, TaskFile):
-                pass
-                # self.update_defined_vars(defined_vars, obj.variables, VariableType.TaskVars)
-            elif isinstance(obj, Task):
-                self.update_defined_vars(defined_vars, obj.variables, VariableType.TaskVars)
-                self.update_defined_vars(defined_vars, obj.set_facts, VariableType.SetFacts)
-                registered_vars.update(obj.registered_variables)
-
-            # used variables
-            new_used_vars = {}
-            if isinstance(obj, Task):
-                used_vars_in_task = extract_variables(obj.module_options)
-                for var_name in used_vars_in_task:
-                    if var_name not in used_vars:
-                        new_used_vars[var_name] = None
-                
-            # make a copy of defined_vars because it is updated by the next object in the sequence
-            # and we remove precedence info here
-            defined_vars_key_value = {k: v[0] for k, v in defined_vars.items()}
-
-            if resolve_value:
-                resolved_new_used_vars = self.resolve_used_vars(new_used_vars, defined_vars_key_value, registered_vars)
-                used_vars.update(resolved_new_used_vars)
-
-            obj_and_vars_list.append((obj, defined_vars_key_value, used_vars))
-
-            if set_annotation:
-                obj.annotations["defined_vars"] = defined_vars_key_value
-                obj.annotations["used_vars"] = used_vars
-        return obj_and_vars_list
-
-    def resolve_used_vars(self, used_vars, defined_vars, registered_vars=None):
-        resolved_used_vars = {}
-        flat_vars_dict = flatten_vars_dict(defined_vars)
-        for var_name in used_vars:
-            var_value, found, skip = resolve_var(var_name, flat_vars_dict, registered_vars)
-
-            if not found:
-                var_value = make_value_placeholder(var_name)
-
-            if not skip:
-                resolved_used_vars = self.update_resolved_vars_dict(resolved_used_vars, var_name, var_value)
-        return resolved_used_vars
     
     def update_resolved_vars_dict(self, vars_dict, var_name, var_value):
         def _recursive_update(d, keys, value):
@@ -279,37 +237,6 @@ def make_value_placeholder(var_name: str):
     return "{{ " + var_name + " }}"
     
 
-def resolve_var(var_name, flat_vars_dict, registered_vars=None):
-    var_value = None
-    found = False
-    skip = False
-    if var_name in flat_vars_dict:
-        var_value = flat_vars_dict[var_name]
-        found = True
-    
-    if found:
-        if isinstance(var_value, str):
-            var_value, skip = render_variable(var_value, flat_vars_dict, registered_vars)
-            # var_value, skip = render_variable(var_value, flat_vars_dict)
-    else:
-        root_var_name = var_name.split(".")[0]
-        root_var_value = None
-        if root_var_name in flat_vars_dict:
-            root_var_value = flat_vars_dict[root_var_name]
-        if isinstance(registered_vars, dict):
-            # if root_var is a registered_var, this variable should be skipped
-            if root_var_name in registered_vars:
-                skip = True
-            else:
-                # if root_var is using a registered_var, this variable should be skipped
-                if isinstance(root_var_value, str):
-                    _, using_reg_var = render_variable(root_var_value, flat_vars_dict, registered_vars)
-                    if using_reg_var:
-                        skip = True
-
-    return var_value, found, skip
-        
-
 def flatten_vars_dict(vars_dict: dict, _prefix: str = ""):
     flat_vars_dict = {}
     for k, v in vars_dict.items():
@@ -325,75 +252,14 @@ def flatten_vars_dict(vars_dict: dict, _prefix: str = ""):
     return flat_vars_dict
 
 
-def extract_variables(data: any):
-    variables = []
-    str_arg_values = list_str_values(data)
-    for txt in str_arg_values:
-        var_block_info_list = extract_variable_names(txt)
-        for var_info in var_block_info_list:
-            if not isinstance(var_info, dict):
-                continue
-            var_name = var_info.get("name", None)
-            if not var_name:
-                continue
-            if var_name not in variables:
-                variables.append(var_name)
-    return variables
-
-
-def list_str_values(data: any):
-    str_values = []
-    if isinstance(data, dict):
-        for v in data.values():
-            _tmp = list_str_values(v)
-            str_values.extend(_tmp)
-    elif isinstance(data, list):
-        for v in data:
-            _tmp = list_str_values(v)
-            str_values.extend(_tmp)
-    elif isinstance(data, str):
-        str_values.append(data)
-    else:
-        pass
-    return str_values
-
-
-def render_variable(txt, flat_vars_dict, registered_vars=None):
-    original_txt = f"{txt}"
-    processing_txt = f"{txt}"
-    var_block_info_list = extract_variable_names(processing_txt)
-    skip = False
-    for var_info in var_block_info_list:
-        if not isinstance(var_info, dict):
-            continue
-        orig_var_str = var_info.get("original", None)
-        if not orig_var_str:
-            continue
-        var_name = var_info.get("name", None)
-
-        root_var_name = var_name.split(".")[0]
-        if isinstance(registered_vars, dict):
-            if root_var_name in registered_vars:
-                skip = True
-        
-        if var_name not in flat_vars_dict:
-            continue
-        var_value = flat_vars_dict[var_name]
-        var_value_str = f"{var_value}"
-        processing_txt = processing_txt.replace(orig_var_str, var_value_str)
-    if processing_txt == original_txt:
-        return processing_txt, skip
-    if "{{" in processing_txt:
-        return render_variable(processing_txt, flat_vars_dict)
-    return processing_txt, skip
-    
-
 def extract_variable_names(txt):
     if not variable_block_re.search(txt):
         return []
     found_var_blocks = variable_block_re.findall(txt)
     blocks = []
     for b in found_var_blocks:
+        if "lookup(" in b.replace(" ", ""):
+            continue
         parts = b.split("|")
         var_name = ""
         default_var_name = ""
@@ -402,6 +268,15 @@ def extract_variable_names(txt):
                 var_name = p.replace("{{", "").replace("}}", "").replace(" ", "")
                 if "lookup(" in var_name and "first_found" in var_name:
                     var_name = var_name.split(",")[-1].replace(")", "")
+                if var_name and var_name[0] == "(":
+                    var_name = var_name.split(")")[0].replace("(", "")
+                if "+" in var_name:
+                    sub_parts = var_name.split("+")
+                    for sp in sub_parts:
+                        if sp and sp[0] in ['"', "'"]:
+                            continue
+                        var_name = sp
+                        break
             else:
                 if "default(" in p and ")" in p:
                     default_var = p.replace("}}", "").replace("default(", "").replace(")", "").replace(" ", "")

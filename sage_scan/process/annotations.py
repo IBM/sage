@@ -134,11 +134,7 @@ def set_module_arg_key_annotations(task: Task, knowledge_base=None):
 
             wrong_keys = [key for key in used_keys if key not in available_keys]
 
-            if "ibm.cloudcollection" in module.fqcn:
-                print("[DEBUG] module:", module.fqcn)
             for k in required_keys:
-                if "ibm.cloudcollection" in module.fqcn:
-                    print("[DEBUG] required key:", k)
                 name = k.get("key", "")
                 aliases = k.get("aliases", [])
                 if name in used_keys:

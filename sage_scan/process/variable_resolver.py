@@ -265,7 +265,22 @@ def extract_variable_names(txt):
         default_var_name = ""
         for i, p in enumerate(parts):
             if i == 0:
-                var_name = p.replace("{{", "").replace("}}", "").replace(" ", "")
+                var_name = p.replace("{{", "").replace("}}", "")
+                if " if " in var_name and " else " in var_name:
+                    # this block is not just a variable, but an expression
+                    # we need to split this with a space to get its elements
+                    skip_elements = ["if", "else", "+", "is", "defined"]
+                    sub_parts = var_name.split(" ")
+                    for sp in sub_parts:
+                        if not sp:
+                            continue
+                        if sp and sp in skip_elements:
+                            continue
+                        if sp and sp[0] in ['"', "'"]:
+                            continue
+                        var_name = sp
+                        break
+                var_name = var_name.replace(" ", "")
                 if "lookup(" in var_name and "first_found" in var_name:
                     var_name = var_name.split(",")[-1].replace(")", "")
                 if var_name and var_name[0] == "(":
@@ -273,6 +288,8 @@ def extract_variable_names(txt):
                 if "+" in var_name:
                     sub_parts = var_name.split("+")
                     for sp in sub_parts:
+                        if not sp:
+                            continue
                         if sp and sp[0] in ['"', "'"]:
                             continue
                         var_name = sp

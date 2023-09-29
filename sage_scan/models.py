@@ -465,19 +465,22 @@ class SageProject(object):
         all_call_sequences = []
         for p in self.playbooks:
             call_graph = self._get_call_graph(obj=p, follow_include=follow_include)
-            all_call_sequences.append(call_graph)
-            tmp_taskfile_keys = set([obj.key for obj in call_graph if isinstance(obj, TaskFile)])
+            call_seq = self.call_graph2sequence(call_graph)
+            all_call_sequences.append(call_seq)
+            tmp_taskfile_keys = set([obj.key for obj in call_seq if isinstance(obj, TaskFile)])
             found_taskfile_keys = found_taskfile_keys.union(tmp_taskfile_keys)
         for r in self.roles:
             call_graph = self._get_call_graph(obj=r, follow_include=follow_include)
-            all_call_sequences.append(call_graph)
-            tmp_taskfile_keys = set([obj.key for obj in call_graph if isinstance(obj, TaskFile)])
+            call_seq = self.call_graph2sequence(call_graph)
+            all_call_sequences.append(call_seq)
+            tmp_taskfile_keys = set([obj.key for obj in call_seq if isinstance(obj, TaskFile)])
             found_taskfile_keys = found_taskfile_keys.union(tmp_taskfile_keys)
         for tf in self.taskfiles:
             if tf.key in found_taskfile_keys:
                 continue
             call_graph = self._get_call_graph(obj=tf, follow_include=follow_include)
-            all_call_sequences.append(call_graph)
+            call_seq = self.call_graph2sequence(call_graph)
+            all_call_sequences.append(call_seq)
         return all_call_sequences
     
     # NOTE: currently this returns only 1 sequence found first
@@ -493,9 +496,22 @@ class SageProject(object):
         return found_seq
     
     def get_call_sequence_by_entrypoint(self, entrypoint: Playbook|Role|TaskFile, follow_include: bool=True):
-        return self._get_call_graph(obj=entrypoint, follow_include=follow_include)
+        call_tree = self.get_call_tree_by_entrypoint(entrypoint=entrypoint, follow_include=follow_include)
+        call_seq = self.call_graph2sequence(call_tree)
+        return call_seq
 
-    # get call sequence which starts from the specified object (e.g. playbook -> play -> task)
+    def get_call_tree_by_entrypoint(self, entrypoint: Playbook|Role|TaskFile, follow_include: bool=True):
+        return self._get_call_graph(obj=entrypoint, follow_include=follow_include)
+    
+    def call_graph2sequence(self, call_graph: list=[]):
+        if not call_graph:
+            return []
+        call_seq = [call_graph[0][0]]
+        for (_, c_obj) in call_graph:
+            call_seq.append(c_obj)
+        return call_seq
+
+    # get call graph which starts from the specified object (e.g. playbook -> play -> task)
     def _get_call_graph(self, obj: SageObject=None, key: str="", follow_include: bool=True):
         if not obj and not key:
             raise ValueError("either `obj` or `key` must be non-empty value")
@@ -554,7 +570,7 @@ class SageProject(object):
         _history = [h for h in history]
         _history.append(obj_key)
 
-        call_graph = [obj]
+        call_graph = []
         children_keys = self._get_children_keys_for_graph(obj=obj, follow_include=follow_include)
         if children_keys:
             for c_key in children_keys:
@@ -562,8 +578,10 @@ class SageProject(object):
                 if not c_obj:
                     logger.warn(f"No object found for key `{c_key}`; skip this node")
                     continue
+                call_graph.append((obj, c_obj))
                 sub_graph = self._recursive_get_call_graph(obj=c_obj, history=_history, follow_include=follow_include)
-                call_graph.extend(sub_graph)
+                if sub_graph:
+                    call_graph.extend(sub_graph)
         return call_graph
     
     def object_to_key(self):
@@ -685,6 +703,7 @@ class PlaybookData(object):
     taskfiles: list = field(default_factory=list)
     tasks: list = field(default_factory=list)
 
+    call_tree: list = field(default_factory=list)
     call_seq: list = field(default_factory=list)
     # initialize this with None to clarify whether it is already computed or not
     used_vars: dict = None
@@ -711,7 +730,10 @@ class PlaybookData(object):
                     self.role = role
                     break
 
-        call_seq = self.project.get_call_sequence_by_entrypoint(self.object)
+        call_tree = self.project.get_call_tree_by_entrypoint(self.object)
+        self.call_tree = call_tree
+
+        call_seq = self.project.call_graph2sequence(call_tree)
         self.call_seq = call_seq
 
         for obj in call_seq:
@@ -787,6 +809,7 @@ class TaskFileData(object):
     taskfiles: list = field(default_factory=list)
     tasks: list = field(default_factory=list)
 
+    call_tree: list = field(default_factory=list)
     call_seq: list = field(default_factory=list)
     # initialize this with None to clarify whether it is already computed or not
     used_vars: dict = None
@@ -813,7 +836,10 @@ class TaskFileData(object):
                     self.role = role
                     break
 
-        call_seq = self.project.get_call_sequence_by_entrypoint(self.object)
+        call_tree = self.project.get_call_tree_by_entrypoint(self.object)
+        self.call_tree = call_tree
+
+        call_seq = self.project.call_graph2sequence(call_tree)
         self.call_seq = call_seq
 
         for obj in call_seq:

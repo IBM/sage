@@ -131,6 +131,12 @@ def find_parent_role(taskfile: TaskFile, project: SageProject):
     return None
 
 
+# get call tree which starts from the specified entrypoint
+# call tree is a list of (obj, child_obj)
+def get_call_tree_by_entrypoint(entrypoint: Playbook|Role|TaskFile, project: SageProject, follow_include: bool=True):
+    return project.get_call_tree_by_entrypoint(entrypoint, follow_include)
+
+
 # get all call sequences found in the SageProject
 # call sequence is a sequence of objects executed by an entrypoint
 # e.g.) Playbook --> Play 1 -> Task 1a -> Task 1b -> Play 2 -> Task 2a 

@@ -112,6 +112,7 @@ class SagePipeline(object):
     scanner: ARIScanner = None
     log_level_str: str = ""
     logger: logging.Logger = None
+    silent: bool = False
 
     timeout: float = 0.0
 
@@ -158,7 +159,8 @@ class SagePipeline(object):
     def init_scanner(self):
         _data_dir = self.ari_kb_data_dir
         if not _data_dir:
-            self.logger.debug(f"ARI KB data dir is not configured.")
+            if not self.silent:
+                self.logger.debug(f"ARI KB data dir is not configured.")
         _rules_dir = self.ari_rules_dir
         _rule_id_list = []
         if self.use_ftdata_rule:
@@ -238,7 +240,8 @@ class SagePipeline(object):
         target_str = ", ".join(target_counts)
         total_str = f"(total {len(path_list)} files)"
 
-        self.logger.info(f"Start scanning for {target_str} {total_str}")
+        if not self.silent:
+            self.logger.info(f"Start scanning for {target_str} {total_str}")
 
         input_list = []
 
@@ -344,7 +347,8 @@ class SagePipeline(object):
                 os.remove(fpath)
             except Exception:
                 err = traceback.format_exc()
-                self.logger.warn(f"failed to remove the temporary file \"{fpath}\": {err}")
+                if not self.silent:
+                    self.logger.warn(f"failed to remove the temporary file \"{fpath}\": {err}")
         return output_list
     
     def _sage_project_to_output(self):
@@ -369,7 +373,8 @@ class SagePipeline(object):
 
     
     def run(self, **kwargs):
-        self.logger.info("Running data pipeline")
+        if not self.silent:
+            self.logger.info("Running data pipeline")
         
         self._init_scan_records()
 
@@ -448,7 +453,8 @@ class SagePipeline(object):
             else:
                 output_data = [od.data for od in output_list if isinstance(od, OutputData)]
 
-        self.logger.info("Done")
+        if not self.silent:
+            self.logger.info("Done")
 
         self._clear_scan_records()
         
@@ -588,7 +594,8 @@ class SagePipeline(object):
 
         start_of_this_scan = time.time()
         thread_id = threading.get_native_id()
-        self.logger.debug(f"[{i+1}/{num}] start {_type} {display_name}")
+        if not self.silent:
+            self.logger.debug(f"[{i+1}/{num}] start {_type} {display_name}")
         use_src_cache = True
 
         taskfile_only = False
@@ -629,7 +636,8 @@ class SagePipeline(object):
         except Exception:
             error = traceback.format_exc()
             if error:
-                self.logger.error(f"Failed to scan {path} in {name}: error detail: {error}")
+                if not self.silent:
+                    self.logger.error(f"Failed to scan {path} in {name}: error detail: {error}")
 
         if result:
             for target_result in result.targets:
@@ -732,7 +740,8 @@ class SagePipeline(object):
 
         elapsed_for_this_scan = round(time.time() - start_of_this_scan, 2)
         if elapsed_for_this_scan > 60:
-            self.logger.warn(f"It took {elapsed_for_this_scan} sec. to process [{i+1}/{num}] {_type} {name}")
+            if not self.silent:
+                self.logger.warn(f"It took {elapsed_for_this_scan} sec. to process [{i+1}/{num}] {_type} {name}")
 
 
     def get_all_files_from_scandata(self, scandata, scan_root_dir):

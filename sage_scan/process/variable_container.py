@@ -16,7 +16,7 @@ with open(vars_file, "r") as f:
 @dataclass
 class VarCont:
     obj_key: str = ""
-    used_vars: [] = field(default_factory=list)
+    used_vars: {} = field(default_factory=dict)
     # set_vars: field(default_factory=dict)
     set_scoped_vars: {} = field(default_factory=dict) # available in children
     set_explicit_scoped_vars: {} = field(default_factory=dict) # available in children
@@ -25,7 +25,7 @@ class VarCont:
     def accum(self, vc):
         self.set_explicit_scoped_vars |= vc.set_explicit_scoped_vars
         self.set_scoped_vars |= vc.set_scoped_vars
-        self.used_vars = self.used_vars + vc.used_vars
+        self.used_vars |= vc.used_vars
         return 
     
     def get_used_vars(self):
@@ -58,58 +58,55 @@ def make_vc_arr(call_seq):
 
 # return if a variable v1 is defined in an another variable v2.
 def check_if_defined(used_var, defined_var):
-    used_var_name = used_var["name"]
-    if used_var_name == defined_var or used_var_name.startswith(defined_var):
+    if used_var == defined_var or used_var.startswith(defined_var):
         return True 
     return False
 
 
 def check_if_defined_explicitly(used_var, defined_var):
-    used_var_name = used_var["name"]
-    if used_var_name == defined_var:
+    if used_var == defined_var:
         return True 
     return False
 
 
 def check_if_magic_vars(used_var):
-    used_var_name = used_var["name"]
-    if "." in used_var_name:
-        used_var_name = used_var_name.split(".")[0]
-    if used_var_name in magic_vars:
+    if "." in used_var:
+        used_var = used_var.split(".")[0]
+    if used_var in magic_vars:
         return True
-    if used_var_name.startswith("ansible_"):
+    if used_var.startswith("ansible_"):
         return True
-    if used_var_name == "default(omit)" or used_var_name == "default(false)":
+    if used_var == "default(omit)" or used_var == "default(false)":
         return True
     return False
 
 # return all vars in vc.used_vars but not in accum_vc.set_vars
 def find_undefined_vars(vc: VarCont, accum_vc: VarCont):
-    undefined_vars = []
-    for v1 in vc.used_vars:
+    undefined_vars = {}
+    for v1_name, v1_val in vc.used_vars.items():
         in_scoped_vars = False
         in_local_vars = False
-        if check_if_magic_vars(v1):
+        if check_if_magic_vars(v1_name):
             continue
         for v2 in accum_vc.set_scoped_vars:
-            if check_if_defined(v1, v2):
+            if check_if_defined(v1_name, v2):
                 in_scoped_vars = True
                 break
         if in_scoped_vars:
             continue
         for v2 in accum_vc.set_explicit_scoped_vars:
-            if check_if_defined_explicitly(v1, v2):
+            if check_if_defined_explicitly(v1_name, v2):
                 in_scoped_vars = True
                 break
         if in_scoped_vars:
             continue
         for v2 in vc.set_local_vars:
-            if check_if_defined(v1, v2):
+            if check_if_defined(v1_name, v2):
                 in_local_vars = True
                 break
         if in_local_vars:
             continue
-        undefined_vars.append(v1)
+        undefined_vars[v1_name] = v1_val
     return undefined_vars, vc.used_vars
 
 
@@ -201,17 +198,22 @@ def used_vars_in_task(task: Task):
     vars_in_options = extract_var_parts(flat_options)
     special_vars = check_when_option(options)
     vars_in_module_options = extract_var_parts(flat_module_options)
-    return vars_in_options + vars_in_module_options + special_vars
+    all_used_vars = {}
+    all_used_vars |= vars_in_options
+    all_used_vars |= vars_in_module_options
+    all_used_vars |= special_vars
+    return all_used_vars
 
 
 def extract_var_parts(options: dict):
-    vars_in_option = []
+    vars_in_option = {}
     for o, ov in options.items():
         if type(ov) != str:
             continue
         if "{{" in ov:
             vars = extract_variable_names(ov)
-            vars_in_option.extend(vars)
+            for v in vars:
+                vars_in_option[v["name"]] = v
             # for var in vars:
             #     var["value_type"] = type
             #     var["key"] = o
@@ -220,7 +222,7 @@ def extract_var_parts(options: dict):
 
 
 def check_when_option(options):
-    used_vars = []
+    used_vars = {}
     if "when" not in options:
         return used_vars
     when_value = options["when"]
@@ -254,7 +256,7 @@ def check_when_option(options):
             continue
         if p.isdigit():
             continue
-        used_vars.append({"original": p, "name": p})
+        used_vars[p] = {"original": p, "name": p}
     return used_vars
 
 
@@ -307,18 +309,16 @@ def flatten_dict(d, parent_key='', sep='.'):
 
 
 def find_all_undefined_vars(call_tree, vc_arr):
-    undefined_vars = []
-    used_vars = []
+    undefined_vars = {}
+    used_vars = {}
 
     accum_vc = VarCont()
     for vc in vc_arr.values():
         accum_vc = compute_accum_vc(call_tree, vc_arr, vc.obj_key)
         und_vars, _used_vars = find_undefined_vars(vc, accum_vc)
-        undefined_vars.extend(und_vars)
-        used_vars.extend(_used_vars)
+        undefined_vars |= und_vars
+        used_vars |= _used_vars
 
-    used_vars = [dict(t) for t in {tuple(sorted(d.items())): d for d in used_vars}.values()]
-    undefined_vars = [dict(t) for t in {tuple(sorted(d.items())): d for d in undefined_vars}.values()]
     return undefined_vars, used_vars
 
 
@@ -359,12 +359,11 @@ def find_all_set_vars(pd: PlaybookData|TaskFileData, call_tree, vc_arr, check_po
 
 
 def get_undefined_vars_value(set_vars, undefined_vars):
-    defined_in_parents = []
-    for ud in undefined_vars:
-        ud_name = ud["name"]
+    defined_in_parents = {}
+    for ud_name, val in undefined_vars.items():
         if ud_name in set_vars:
-            ud["value"] = set_vars[ud_name]
-            defined_in_parents.append(ud)
+            val["value"] = set_vars[ud_name]
+            defined_in_parents[ud_name] = val
     return defined_in_parents
 
 

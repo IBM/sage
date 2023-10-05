@@ -6,6 +6,7 @@ from sage_scan.models import Playbook, TaskFile, Play, Task, Role, PlaybookData,
 from sage_scan.process.variable_resolver import extract_variable_names
 import json
 import os
+import copy
 
 magic_vars = []
 vars_file = os.getenv("VARS_FILE", os.path.join(os.path.dirname(__file__),"ansible_variables.txt"))
@@ -360,8 +361,9 @@ def get_undefined_vars_value(set_vars, undefined_vars):
     defined_in_parents = {}
     for ud_name, val in undefined_vars.items():
         if ud_name in set_vars:
-            val["value"] = set_vars[ud_name]
-            defined_in_parents[ud_name] = val
+            _val = copy.copy(val)
+            _val["value"] = set_vars[ud_name]
+            defined_in_parents[ud_name] = _val
     return defined_in_parents
 
 

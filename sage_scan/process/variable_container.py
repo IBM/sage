@@ -113,6 +113,7 @@ def find_undefined_vars(vc: VarCont, accum_vc: VarCont):
 def compute_accum_vc(call_tree, vc_arr, obj_key):
     parents=[]
     parents = traverse_and_get_parents(obj_key, call_tree, parents)
+    parents.reverse()
     accum_vc = VarCont()
     for p in parents:
         pvc = vc_arr[p]
@@ -141,8 +142,8 @@ def traverse_and_get_parents(node_key, call_tree, parent_nodes):
             parent_nodes.extend(sibling)
             parent_nodes.append(parent.key)
             traverse_and_get_parents(parent.key, call_tree, parent_nodes)
-    parent_nodes.reverse()
-    # print("parents:", json.dumps(parent_nodes, indent=4))
+            break
+    # parent_nodes.reverse()
     return parent_nodes
 
 
@@ -344,9 +345,6 @@ def find_all_set_vars(pd: PlaybookData|TaskFileData, call_tree, vc_arr, check_po
     all_set_vars = {}
     if not check_point:
         check_point = call_tree[-1][1].key
-    parents = []
-    parents = traverse_and_get_parents(check_point, call_tree, parents)
-    # print("parents:", json.dumps(parents, indent=4))
     accum_vc = compute_accum_vc(call_tree, vc_arr, check_point)
     if isinstance(pd, TaskFileData):
         if pd.role:

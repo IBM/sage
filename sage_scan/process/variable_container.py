@@ -367,6 +367,40 @@ def get_undefined_vars_value(set_vars, undefined_vars):
     return defined_in_parents
 
 
+def get_set_vars_from_data(pd: PlaybookData|TaskFileData):
+    call_tree = pd.call_tree
+    call_seq = pd.call_seq
+    vc_arr = make_vc_arr(call_seq)
+    set_vars = find_all_set_vars(pd, call_tree, vc_arr)
+    return set_vars
+
+
+def get_used_vars_from_data(pd: PlaybookData|TaskFileData):
+    call_tree = pd.call_tree
+    call_seq = pd.call_seq
+    vc_arr = make_vc_arr(call_seq)
+    _, used_vars = find_all_undefined_vars(call_tree, vc_arr)
+    return used_vars
+
+
+def get_undefined_vars_in_obj_from_data(pd: PlaybookData|TaskFileData):
+    call_tree = pd.call_tree
+    call_seq = pd.call_seq
+    vc_arr = make_vc_arr(call_seq)
+    undefined_vars_in_obj, _ = find_all_undefined_vars(call_tree, vc_arr)
+    return undefined_vars_in_obj
+
+
+def get_undefined_vars_value_from_data(pd: PlaybookData|TaskFileData):
+    call_tree = pd.call_tree
+    call_seq = pd.call_seq
+    vc_arr = make_vc_arr(call_seq)
+    set_vars = find_all_set_vars(pd, call_tree, vc_arr)
+    undefined_vars_in_obj, _ = find_all_undefined_vars(call_tree, vc_arr)
+    undefined_vars_value = get_undefined_vars_value(set_vars, undefined_vars_in_obj)
+    return undefined_vars_value
+
+
 def resolve_variables(pd: PlaybookData|TaskFileData):
     call_tree = pd.call_tree
     call_seq = pd.call_seq

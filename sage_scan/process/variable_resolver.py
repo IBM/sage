@@ -294,6 +294,18 @@ def extract_variable_names(txt):
                             continue
                         var_name = sp
                         break
+                if "[" in var_name and "." not in var_name:
+                    # extract dict/list name
+                    dict_pattern = r'(\w+)\[(\'|").*(\'|")\]'
+                    match = re.search(dict_pattern, var_name)
+                    if match:
+                        matched_str = match.group(1)
+                        var_name = matched_str.split("[")[0]
+                    list_pattern = r'(\w+)\[\-?\d+\]'
+                    match = re.search(list_pattern, var_name)
+                    if match:
+                        matched_str = match.group(1)
+                        var_name = matched_str.split("[")[0]
             else:
                 if "default(" in p and ")" in p:
                     default_var = p.replace("}}", "").replace("default(", "").replace(")", "").replace(" ", "")

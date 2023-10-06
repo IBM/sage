@@ -341,7 +341,7 @@ def find_all_undefined_vars_in_pbdata(pb, vc_arr):
 
 def find_all_set_vars(pd: PlaybookData|TaskFileData, call_tree, vc_arr, check_point=""):
     if not call_tree:
-        return {}
+        return {}, {}
 
     all_set_vars = {}
     role_vars = {}

@@ -344,6 +344,7 @@ def find_all_set_vars(pd: PlaybookData|TaskFileData, call_tree, vc_arr, check_po
         return {}
 
     all_set_vars = {}
+    role_vars = {}
     if not check_point:
         check_point = call_tree[-1][1].key
     accum_vc = compute_accum_vc(call_tree, vc_arr, check_point)
@@ -352,9 +353,11 @@ def find_all_set_vars(pd: PlaybookData|TaskFileData, call_tree, vc_arr, check_po
             parent_role = pd.role
             r_vc = get_vc_from_role(parent_role)
             accum_vc.accum(r_vc)
+            role_vars |= r_vc.set_explicit_scoped_vars
+            role_vars |= r_vc.set_scoped_vars
     all_set_vars |= accum_vc.set_explicit_scoped_vars
     all_set_vars |= accum_vc.set_scoped_vars
-    return all_set_vars
+    return all_set_vars, role_vars
 
 
 def get_undefined_vars_value(set_vars, undefined_vars):
@@ -371,8 +374,8 @@ def get_set_vars_from_data(pd: PlaybookData|TaskFileData):
     call_tree = pd.call_tree
     call_seq = pd.call_seq
     vc_arr = make_vc_arr(call_seq)
-    set_vars = find_all_set_vars(pd, call_tree, vc_arr)
-    return set_vars
+    set_vars, role_vars = find_all_set_vars(pd, call_tree, vc_arr)
+    return set_vars, role_vars
 
 
 def get_used_vars_from_data(pd: PlaybookData|TaskFileData):
@@ -405,10 +408,10 @@ def resolve_variables(pd: PlaybookData|TaskFileData):
     call_tree = pd.call_tree
     call_seq = pd.call_seq
     vc_arr = make_vc_arr(call_seq)
-    set_vars = find_all_set_vars(pd, call_tree, vc_arr)
+    set_vars, role_vars = find_all_set_vars(pd, call_tree, vc_arr)
     undefined_vars_in_obj, used_vars = find_all_undefined_vars(call_tree, vc_arr)
     undefined_vars_value = get_undefined_vars_value(set_vars, undefined_vars_in_obj)
-    return set_vars, used_vars, undefined_vars_in_obj, undefined_vars_value
+    return set_vars, role_vars, used_vars, undefined_vars_in_obj, undefined_vars_value
 
 
 def main():
@@ -446,10 +449,11 @@ def main():
 
     results = []
     for pd in pbdata_arr:
-        set_vars, used_vars, undefined_vars_in_obj, undefined_vars_value = resolve_variables(pd)
+        set_vars, role_vars, used_vars, undefined_vars_in_obj, undefined_vars_value = resolve_variables(pd)
         result = {
             "entrypoint": pd.object.key,
             "set_vars": set_vars,
+            "role_vars": role_vars,
             "used_vars": used_vars,
             "undefined_vars_in_pddata": undefined_vars_in_obj,
             "undefined_vars_value": undefined_vars_value 

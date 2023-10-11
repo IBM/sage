@@ -264,28 +264,29 @@ def check_when_option(options):
 
 def flatten_dict_list(d, parent_key='', sep='.'):
     items = {}
-    if type(d) == str:
-        items["value"] = d
+    if d is None:
         return items
     if type(d) == list:
         for i, v in enumerate(d):
             items[i] = v
         return items
-    if not d:
+    elif type(d) == dict:
+        for key, value in d.items():
+            new_key = f"{parent_key}{sep}{key}" if parent_key else key
+            if isinstance(value, dict):
+                items.update(flatten_dict_list(value, new_key, sep=sep))
+            elif isinstance(value, list):
+                for v in value:
+                    list_new_key = f"{new_key}[{value.index(v)}]"
+                    if isinstance(v, dict):
+                        items.update(flatten_dict_list(v, list_new_key, sep=sep))
+                    else:
+                        items[list_new_key] = v
+            else:
+                items[new_key] = value
+    else:
+        items["value"] = d
         return items
-    for key, value in d.items():
-        new_key = f"{parent_key}{sep}{key}" if parent_key else key
-        if isinstance(value, dict):
-            items.update(flatten_dict_list(value, new_key, sep=sep))
-        elif isinstance(value, list):
-            for v in value:
-                list_new_key = f"{new_key}[{value.index(v)}]"
-                if isinstance(v, dict):
-                    items.update(flatten_dict_list(v, list_new_key, sep=sep))
-                else:
-                    items[list_new_key] = v
-        else:
-            items[new_key] = value
     return items
 
 

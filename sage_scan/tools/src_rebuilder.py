@@ -76,6 +76,9 @@ def prepare_source_dir(root_dir, yaml_file):
             path = content.get("path")
             if path == "":
                 path = "example.yml"
+            # TODO: find a better way
+            elif path.endswith(".py"):
+                path = path[:-3] + ".yml"
             text = content.get("text")
             source = content.get("source")
             license = content.get("license")

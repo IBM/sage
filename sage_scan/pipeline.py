@@ -422,6 +422,12 @@ class SagePipeline(object):
         else:
             self._single_scan(input_list)
             self.check_timeout()
+
+        if isinstance(kwargs, dict) and "process_fn" in kwargs:
+            process_fn = kwargs["process_fn"]
+            objects = self.scan_records["objects"]
+            objects = process_fn(objects)
+            self.scan_records["objects"] = objects
         
         self.yml_inventory = self.create_yml_inventory()
         if output_dir and self.do_save_yml_inventory:
@@ -891,7 +897,7 @@ def get_yml_label(file_path, root_path):
     role_info = None
     if role_name and role_path:
         relative_role_path = role_path.replace(root_path, "")
-        if relative_role_path[0] == "/":
+        if relative_role_path and relative_role_path[0] == "/":
             relative_role_path = relative_role_path[1:]
         role_info = {"name": role_name, "path": role_path, "relative_path": relative_role_path}
 

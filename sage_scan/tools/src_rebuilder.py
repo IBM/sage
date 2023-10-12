@@ -21,7 +21,7 @@ import os
 import copy
 
 
-def prepare_source_dir(root_dir, yaml_file):
+def prepare_source_dir(root_dir, src_json):
     path_list = []
     if not os.path.exists(root_dir):
         os.makedirs(root_dir)
@@ -36,7 +36,7 @@ def prepare_source_dir(root_dir, yaml_file):
         "ugns/ansible-ssg",
     ]
     
-    yaml_file_contents = load_json_data(yaml_file)
+    yaml_file_contents = load_json_data(src_json)
     for content in yaml_file_contents:
         if "namespace_name" in content:
             type = "collection_role"

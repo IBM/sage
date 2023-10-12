@@ -186,6 +186,7 @@ if __name__ == "__main__":
 
         err = None
         try:
+            prepare_source_dir(root_dir=src_rb_dir, src_json=src_json)
             dp.run(
                 target_dir=tdir,
                 output_dir=odir,

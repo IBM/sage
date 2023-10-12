@@ -163,7 +163,7 @@ if __name__ == "__main__":
     os.makedirs(path_list_dir, exist_ok=True)
     os.makedirs(result_dir, exist_ok=True)
 
-    dp = SagePipeline()
+    dp = SagePipeline(silent=True)
     out_scope = [
         "IBM/playbook-integrity-operator",
         "RedHatOfficial/ansible-role-rhv4-rhvh-stig",

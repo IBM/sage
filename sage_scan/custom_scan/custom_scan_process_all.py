@@ -16,6 +16,7 @@
 
 from sage_scan.pipeline import SagePipeline
 import os
+import traceback
 import json
 import time
 import argparse
@@ -130,51 +131,39 @@ def process_fn(objects):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="TODO")
-    parser.add_argument("-t", "--source-type", help='source type (e.g."GitHub-RHIBM")')
-    parser.add_argument("-s", "--source-json", help='source json file path (e.g. "/tmp/RH_IBM_FT_data_GH_api.json")')
+    # parser.add_argument("-t", "--source-type", help='source type (e.g."GitHub-RHIBM")')
+    # parser.add_argument("-s", "--source-json", help='source json file path (e.g. "/tmp/RH_IBM_FT_data_GH_api.json")')
+    parser.add_argument("-f", "--file", help='path to a list of source.json filepaths')
+    parser.add_argument("-d", "--base-dir", help="source json base directory")
     parser.add_argument("-o", "--out-dir", help="output directory")
-    parser.add_argument("-p", "--project-list", help="project list")
-    parser.add_argument("--yml-inventory-only", action="store_true", help="yml inventory only mode")
+    parser.add_argument("-e", "--error-log", help='error log file')
+    # parser.add_argument("-t", "--timeout", default="120", help='timeout seconds for each project')
     args = parser.parse_args()
 
+    src_json_list_file = args.file
+    src_json_base_dir = args.base_dir
+    src_json_list = []
+    with open(src_json_list_file, "r") as file:
+        for line in file:
+            relative_path = line.strip()
+            parts = relative_path.split("/")
+            src_type = parts[0]
+            repo_name = "/".join(parts[1:-1]) if len(parts) > 2 else parts[1]
+            path = os.path.join(src_json_base_dir, relative_path)
+            src_json_list.append((src_type, repo_name, path))
+
     work_dir = args.out_dir
-    src_type = args.source_type
-    src_json = args.source_json
-    project_list = args.project_list
-    yml_inventory_mode = args.yml_inventory_only
     src_rb_dir = os.path.join(work_dir, "src_rb")
     path_list_dir = os.path.join(work_dir, "path_list")
     result_dir = os.path.join(work_dir, "results")
+    err_file = args.error_log
 
     os.makedirs(work_dir, exist_ok=True)
     os.makedirs(src_rb_dir, exist_ok=True)
     os.makedirs(path_list_dir, exist_ok=True)
     os.makedirs(result_dir, exist_ok=True)
 
-    adir = os.path.join(src_rb_dir, src_type)
-    if not os.path.exists(adir) or len(os.listdir(adir)) == 0:
-        outfile = os.path.join(path_list_dir, f"path-list-{src_type}.txt")
-        path_list = prepare_source_dir(adir, src_json)
-        write_result(outfile, path_list)
-
-    if src_json:
-        with open(src_json, "r") as f:
-            records = f.readlines()
-        repo_names = set()
-        for record in records:
-            r = json.loads(record)
-            if "repo_name" in r:
-                repo_names.add(r.get("repo_name"))
-            if "namespace_name" in r:
-                repo_names.add(r.get("namespace_name"))
-
-    if project_list:
-        with open(project_list, "r") as f:
-            repo_names = [s.rstrip() for s in f.readlines()]
-
-    total = len(repo_names)
-    count = 0
-
+    dp = SagePipeline()
     out_scope = [
         "IBM/playbook-integrity-operator",
         "RedHatOfficial/ansible-role-rhv4-rhvh-stig",
@@ -182,42 +171,32 @@ if __name__ == "__main__":
         "bosh-io/releases-index"
     ]
 
-    dp = SagePipeline()
+    total = len(src_json_list)
 
-    timer_path = "/tmp/custom-scan-all-timer.json"
-    for repo_name in repo_names:
+    for i, (src_type, repo_name, src_json) in enumerate(src_json_list):
         if repo_name in out_scope:
-            print(f"skip {repo_name} ({count}/{total})")
-            count += 1
+            print(f"skip {repo_name} ({i+1}/{total})")
             continue
 
-        start = time.time()
+        adir = os.path.join(src_rb_dir, src_type)
         tdir = os.path.join(src_rb_dir, src_type, repo_name)
         odir = os.path.join(result_dir, src_type, repo_name)
-        if os.path.exists(os.path.join(odir, "ftdata.json")):
-            count += 1
-            continue
 
-        # why needed?
-        os.environ["SAGE_CONTENT_ANALYSIS_OUT_DIR"] = odir
+        print(f"scanning {repo_name} ({i+1}/{total})")
 
-        print(f"scanning {repo_name} ({count}/{total})")
+        err = None
+        try:
+            dp.run(
+                target_dir=tdir,
+                output_dir=odir,
+                source={"type": src_type, "repo_name": repo_name},
+                process_fn=process_fn,
+            )
+        except Exception:
+            err = traceback.format_exc()
 
-        dp.run(
-            target_dir=tdir,
-            output_dir=odir,
-            source={"type": src_type, "repo_name": repo_name},
-            yml_inventory_only=yml_inventory_mode,
-            process_fn=process_fn,
-        )
-        count += 1
-
-        end = time.time()
-        elapsed = end - start
-        timer_record = {
-            "repo_name": repo_name,
-            "elapsed": elapsed,
-        }
-        with open(timer_path, "a+") as file:
-            file.write(json.dumps(timer_record) + "\n")
-        
+        if err and err_file:
+            with open(err_file, "a") as efile:
+                efile.write(f"{repo_name} ({i+1}/{total})\n")
+                efile.write(err + "\n")
+                efile.write("-" * 90 + "\n")

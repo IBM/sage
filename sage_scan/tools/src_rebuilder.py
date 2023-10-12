@@ -18,6 +18,7 @@ import argparse
 import json
 import jsonpickle
 import os
+import copy
 
 
 def prepare_source_dir(root_dir, yaml_file):
@@ -104,6 +105,46 @@ def prepare_source_dir(root_dir, yaml_file):
 def extract_directory(file_path):
     directory = os.path.dirname(file_path)
     return directory
+
+
+
+def get_repo_name_from_source_data(single_soruce_data: dict):
+    d = single_soruce_data
+    repo_name = ""
+    if "namespace_name" in d:
+        repo_name = d["namespace_name"]
+    elif "repo_name" in d:
+        repo_name = d["repo_name"]
+    return repo_name
+
+
+# yields source data for each project
+def load_source_data_per_project(filepath):
+    with open(filepath, "r") as file:
+        data = []
+        for line in file:
+            d = json.loads(line)
+            if not d or not isinstance(d, dict):
+                continue
+            repo_name = get_repo_name_from_source_data(d)
+            if len(data) == 0:
+                current_repo_name = repo_name
+            else:
+                current_repo_name = get_repo_name_from_source_data(data[0])
+            
+            if repo_name == current_repo_name:
+                data.append(d)
+            else:
+                # copy the current `data`` to yield it
+                project_data = copy.deepcopy(data)
+                # reset data and append the new project data to it here
+                data = []
+                data.append(d)
+                yield project_data
+        # yield the last project in the source file
+        if data:
+            yield data
+
 
 def load_json_data(filepath):
     with open(filepath, "r") as file:

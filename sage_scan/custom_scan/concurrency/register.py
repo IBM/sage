@@ -84,10 +84,15 @@ if __name__ == '__main__':
         
         for record in records:
             r = json.loads(record)
+            repo_name = ""
             if "repo_name" in r:
-                repo_names.add(r.get("repo_name"))
+                repo_name = r.get("repo_name")
             elif "namespace_name" in r:
-                repo_names.add(r.get("namespace_name"))
+                repo_name = r.get("namespace_name")
+            if not repo_name:
+                continue
+            repo_name_data = {"src_type": src_type, "repo_name": repo_name}
+            repo_names.add(json.dumps(repo_name_data))
     
     elif split_src_dir:
         found_source_json_list = glob.glob(os.path.join(split_src_dir, "**", "source.json"), recursive=True)
@@ -102,7 +107,10 @@ if __name__ == '__main__':
             # outfile = os.path.join(path_list_dir, f"path-list-{src_type}.txt")
             path_list = prepare_source_dir(adir, src_json_path)
             # write_result(outfile, path_list)
-            repo_names.add(repo_name)
+            if not repo_name:
+                continue
+            repo_name_data = {"src_type": src_type, "repo_name": repo_name}
+            repo_names.add(json.dumps(repo_name_data))
 
 
     redis_client = redis.Redis(
@@ -113,7 +121,13 @@ if __name__ == '__main__':
 
     count = 0
     registerd_lines = []
-    for repo_name in repo_names:
+    for repo_name_data_str in repo_names:
+        repo_name_data = json.loads(repo_name_data_str)
+        src_type = repo_name_data.get("src_type", "")
+        repo_name = repo_name_data.get("repo_name", "")
+        if not repo_name:
+            continue
+
         if args.resume:
             if check_if_result_exists(result_dir, src_type, repo_name):
                 # skip because the result exists

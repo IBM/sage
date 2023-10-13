@@ -8,7 +8,7 @@ authors = ["Your Name <you@example.com>"]
 [tool.poetry.dependencies]
 python = "^3.9"
 # ansible-risk-insight = "^0.1.10"
-ansible-risk-insight = { git = "https://github.com/ansible/ansible-risk-insight.git", rev = "4b054e73" }
+ansible-risk-insight = { git = "https://github.com/ansible/ansible-risk-insight.git", rev = "9e5ef3d" }
 celery = "^5.3.1"
 redis = "^4.6.0"
 flower = "^1.0.0"

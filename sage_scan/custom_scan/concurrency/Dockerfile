@@ -1,7 +1,5 @@
 FROM python:3.11-buster
 
-ARG GIT_ACCESS_TOKEN
-
 WORKDIR /root
 
 ENV POETRY_HOME="/opt/poetry" \

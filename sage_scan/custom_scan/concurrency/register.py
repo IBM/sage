@@ -19,6 +19,7 @@ import os
 import argparse
 import json
 import redis
+import glob
 from sage_scan.tools.src_rebuilder import write_result, prepare_source_dir
 
 
@@ -47,6 +48,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="TODO")
     parser.add_argument("-t", "--source-type", help='source type (e.g."GitHub-RHIBM")')
     parser.add_argument("-s", "--source-json", help='source json file path (e.g. "/tmp/RH_IBM_FT_data_GH_api.json")')
+    parser.add_argument("--split-source-dir", help='split source dir path (exclusive with --source-json)')
     parser.add_argument("-o", "--out-dir", default="./sage_concurrency_work_dir", help="output directory")
     parser.add_argument("--timeout", help="timeout seconds")
     parser.add_argument("--resume", action="store_true", help="if true, only tasks without existing results are registered (queued tasks are also skipped)")
@@ -58,6 +60,8 @@ if __name__ == '__main__':
     in_container_work_dir = "/work_dir"
     src_type = args.source_type
     src_json = args.source_json
+    split_src_dir = args.split_src_dir
+
     src_rb_dir = os.path.join(work_dir, "src_rb")
     path_list_dir = os.path.join(work_dir, "path_list")
     result_dir = os.path.join(work_dir, "results")
@@ -67,14 +71,14 @@ if __name__ == '__main__':
     os.makedirs(path_list_dir, exist_ok=True)
     os.makedirs(result_dir, exist_ok=True)
 
-    adir = os.path.join(src_rb_dir, src_type)
-    if not os.path.exists(adir) or len(os.listdir(adir)) == 0:
-        outfile = os.path.join(path_list_dir, f"path-list-{src_type}.txt")
-        path_list = prepare_source_dir(adir, src_json)
-        write_result(outfile, path_list)
-
     repo_names = set()
-    if src_json:
+    if src_type and src_json:
+        adir = os.path.join(src_rb_dir, src_type)
+        if not os.path.exists(adir) or len(os.listdir(adir)) == 0:
+            outfile = os.path.join(path_list_dir, f"path-list-{src_type}.txt")
+            path_list = prepare_source_dir(adir, src_json)
+            write_result(outfile, path_list)
+        
         with open(src_json, "r") as f:
             records = f.readlines()
         
@@ -84,6 +88,22 @@ if __name__ == '__main__':
                 repo_names.add(r.get("repo_name"))
             elif "namespace_name" in r:
                 repo_names.add(r.get("namespace_name"))
+    
+    elif split_src_dir:
+        found_source_json_list = glob.glob(os.path.join(split_src_dir, "**", "source.json"), recursive=True)
+        for src_json_path in found_source_json_list:
+            relative_path = src_json_path[len(split_src_dir):]
+            if relative_path and relative_path[0] == "/":
+                relative_path = relative_path[1:]
+            parts = relative_path.split("/")
+            src_type = parts[0]
+            repo_name = "/".join(parts[1:-1])
+            adir = os.path.join(src_rb_dir, src_type)
+            # outfile = os.path.join(path_list_dir, f"path-list-{src_type}.txt")
+            path_list = prepare_source_dir(adir, src_json_path)
+            # write_result(outfile, path_list)
+            repo_names.add(repo_name)
+
 
     redis_client = redis.Redis(
         host=REDIS_SERVER_URL,

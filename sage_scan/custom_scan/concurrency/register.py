@@ -96,13 +96,15 @@ if __name__ == '__main__':
     
     elif split_src_dir:
         found_source_json_list = glob.glob(os.path.join(split_src_dir, "**", "source.json"), recursive=True)
-        for src_json_path in found_source_json_list:
+        total = len(found_source_json_list)
+        for i, src_json_path in enumerate(found_source_json_list):
             relative_path = src_json_path[len(split_src_dir):]
             if relative_path and relative_path[0] == "/":
                 relative_path = relative_path[1:]
             parts = relative_path.split("/")
             src_type = parts[0]
             repo_name = "/".join(parts[1:-1])
+            print(f"[{i+1}/{total}] source rebuilding {repo_name}")
             adir = os.path.join(src_rb_dir, src_type)
             # outfile = os.path.join(path_list_dir, f"path-list-{src_type}.txt")
             path_list = prepare_source_dir(adir, src_json_path)

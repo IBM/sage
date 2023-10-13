@@ -60,7 +60,7 @@ if __name__ == '__main__':
     in_container_work_dir = "/work_dir"
     src_type = args.source_type
     src_json = args.source_json
-    split_src_dir = args.split_src_dir
+    split_src_dir = args.split_source_dir
 
     src_rb_dir = os.path.join(work_dir, "src_rb")
     path_list_dir = os.path.join(work_dir, "path_list")

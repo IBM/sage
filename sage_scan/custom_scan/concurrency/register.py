@@ -34,6 +34,12 @@ def check_if_result_exists(result_dir: str, src_type: str, repo_name: str):
     return exists
 
 
+def check_if_src_rb_exists(src_rb_dir: str, src_type: str, repo_name: str):
+    src_path = os.path.join(src_rb_dir, src_type, repo_name)
+    exists = os.path.exists(src_path)
+    return exists
+
+
 # TODO: imeplement this
 def is_task_queued(redis_client: redis.Redis, queue_name: str, src_type: str, repo_name: str):
     # redis_client.lrange(queue_name, 0, -1)
@@ -72,6 +78,7 @@ if __name__ == '__main__':
     os.makedirs(result_dir, exist_ok=True)
 
     repo_names = set()
+    scan_time_source_rebuilding = False
     if src_type and src_json:
         adir = os.path.join(src_rb_dir, src_type)
         if not os.path.exists(adir) or len(os.listdir(adir)) == 0:
@@ -95,19 +102,20 @@ if __name__ == '__main__':
             repo_names.add(json.dumps(repo_name_data))
     
     elif split_src_dir:
+        scan_time_source_rebuilding = True
+        print(f"searching source.json in {split_src_dir}")
         found_source_json_list = glob.glob(os.path.join(split_src_dir, "**", "source.json"), recursive=True)
         total = len(found_source_json_list)
-        for i, src_json_path in enumerate(found_source_json_list):
+        print(f"{total} found")
+        for src_json_path in found_source_json_list:
             relative_path = src_json_path[len(split_src_dir):]
             if relative_path and relative_path[0] == "/":
                 relative_path = relative_path[1:]
             parts = relative_path.split("/")
             src_type = parts[0]
             repo_name = "/".join(parts[1:-1])
-            print(f"[{i+1}/{total}] source rebuilding {repo_name}")
-            adir = os.path.join(src_rb_dir, src_type)
+            # adir = os.path.join(src_rb_dir, src_type)
             # outfile = os.path.join(path_list_dir, f"path-list-{src_type}.txt")
-            path_list = prepare_source_dir(adir, src_json_path)
             # write_result(outfile, path_list)
             if not repo_name:
                 continue
@@ -140,6 +148,12 @@ if __name__ == '__main__':
             # if is_task_queued(redis_client, "queue", src_type, repo_name):
             #     # skip because the task is found in the current queue
             #     continue
+
+        if scan_time_source_rebuilding:
+            if not check_if_src_rb_exists(src_rb_dir, src_type, repo_name):
+                adir = os.path.join(src_rb_dir, src_type)
+                src_json_path = os.path.join(split_src_dir, src_type, repo_name, "source.json")
+                _ = prepare_source_dir(adir, src_json_path)
 
         target_dir = os.path.join(in_container_work_dir, "src_rb", src_type, repo_name)
         

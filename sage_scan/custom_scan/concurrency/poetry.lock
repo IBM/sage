@@ -73,8 +73,8 @@ tabulate = "*"
 [package.source]
 type = "git"
 url = "https://github.com/ansible/ansible-risk-insight.git"
-reference = "9e5ef3d"
-resolved_reference = "9e5ef3df40d3c16d457f3e193d72c719deb75455"
+reference = "58bce76"
+resolved_reference = "58bce766c2ada0dae4e5504fc65b04e5566c335d"
 
 [[package]]
 name = "async-timeout"
@@ -1323,4 +1323,4 @@ files = [
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.9"
-content-hash = "3927038bb15166054f678382eb99d70d0736af8e3cb42c573bb3be11e05ae20a"
+content-hash = "97dde651b65f3b82c948fbb9be5ce3d945de86e93acd982ab00dc176a93992cc"

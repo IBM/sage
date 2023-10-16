@@ -16,8 +16,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      args:    
-        - GIT_ACCESS_TOKEN=${GIT_ACCESS_TOKEN}
     hostname: worker
     command: celery --app tasks.celery worker --concurrency 8 --loglevel=info
     environment:
@@ -37,8 +35,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      args:    
-        - GIT_ACCESS_TOKEN=${GIT_ACCESS_TOKEN}
     command: celery --app tasks.celery --broker=redis://redis:6379/1 flower --persistent=True --db="/work_dir/flower_data/flower.db" --port=5555
     ports:
       - 5556:5555
@@ -61,8 +57,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      args:    
-        - GIT_ACCESS_TOKEN=${GIT_ACCESS_TOKEN}
     hostname: trigger
     command: python trigger.py
     environment:

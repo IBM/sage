@@ -20,8 +20,6 @@ $ cd sage_scan/custom_scan/concurrency
 
 ```bash
 $ export ARI_KB_DATA_DIR=<PATH/TO/YOUR_ARI_KB_DATA_DIR>
-
-$ export GIT_ACCESS_TOKEN=<YOUR_GIT_ACCESS_TOKEN>
 ```
 
 ### 3. Run backends by `docker-compose` command

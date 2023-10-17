@@ -1,7 +1,5 @@
 import argparse
 from dataclasses import dataclass, field
-
-from click import option
 from sage_scan.models import load_objects
 from sage_scan.process.utils import list_entrypoints, get_taskfiles_in_role
 from sage_scan.models import Playbook, TaskFile, Play, Task, Role, PlaybookData, TaskFileData
@@ -37,6 +35,7 @@ class VarCont:
         return self.used_vars
 
 
+# return VarCont
 def to_vc(obj):
     vc = None
     if isinstance(obj, Playbook):
@@ -52,6 +51,7 @@ def to_vc(obj):
     return vc
 
 
+# return VarCont list
 def make_vc_arr(call_seq):
     vc_arr = {}
     for obj in call_seq:
@@ -84,6 +84,7 @@ def check_if_magic_vars(used_var):
     if used_var == "default(omit)" or used_var == "default(false)":
         return True
     return False
+
 
 # return all vars in vc.used_vars but not in accum_vc.set_vars
 def find_undefined_vars(vc: VarCont, accum_vc: VarCont):
@@ -216,6 +217,7 @@ def get_vc_from_task(task: Task):
     return vc
 
 
+# return used vars in a task
 def used_vars_in_task(task: Task):
     options = task.options
     module_options = task.module_options
@@ -247,6 +249,7 @@ def extract_var_parts(options: dict):
     return vars_in_option
 
 
+# return used vars in when option
 def check_when_option(options):
     used_vars = {}
     if "when" not in options and "failed_when" not in options:
@@ -279,6 +282,7 @@ def check_when_option(options):
     used_vars |= _used_vars
     return used_vars
 
+
 def extract_when_option_var_name(option_parts, is_failed_when=False):
     used_vars = {}
     ignore_words = ["defined", "undefined", "is", "not", "and", "or", "|", "in", "none"]
@@ -307,6 +311,7 @@ def extract_when_option_var_name(option_parts, is_failed_when=False):
         else:
             used_vars[p] = {"original": p, "name": p}
     return used_vars
+
 
 def flatten_dict_list(d, parent_key='', sep='.'):
     items = {}

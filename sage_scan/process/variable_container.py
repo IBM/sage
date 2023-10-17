@@ -91,6 +91,7 @@ def find_undefined_vars(vc: VarCont, accum_vc: VarCont):
     for v1_name, v1_val in vc.used_vars.items():
         in_scoped_vars = False
         in_local_vars = False
+        in_set_vars = False  # check with set vars in the same task when vars is used in 'failed_when' 
         if check_if_magic_vars(v1_name):
             continue
         for v2 in accum_vc.set_scoped_vars:
@@ -111,6 +112,13 @@ def find_undefined_vars(vc: VarCont, accum_vc: VarCont):
                 break
         if in_local_vars:
             continue
+        if v1_val.get("in_failed_when", False):
+            for v2 in vc.set_scoped_vars:
+                if check_if_defined(v1_name, v2):
+                    in_set_vars = True
+                    break
+            if in_set_vars:
+                continue
         undefined_vars[v1_name] = v1_val
     return undefined_vars, vc.used_vars
 
@@ -250,6 +258,10 @@ def check_when_option(options):
     else:
         all_parts = re.split('[ |]', when_value)
 
+    _used_vars = extract_when_option_var_name(all_parts)
+    used_vars |= _used_vars
+
+    all_parts = []
     if type(failed_when_value) == list:
         for v in failed_when_value:
             all_parts.extend(re.split('[ |]', v))
@@ -258,11 +270,16 @@ def check_when_option(options):
             all_parts.extend(re.split('[ |]', v))
     else:
         all_parts = re.split('[ |]', failed_when_value)
+    _used_vars = extract_when_option_var_name(all_parts, is_failed_when=True)
+    used_vars |= _used_vars
+    return used_vars
 
+def extract_when_option_var_name(option_parts, is_failed_when=False):
+    used_vars = {}
     ignore_words = ["defined", "undefined", "is", "not", "and", "or", "|", "in", "none"]
     boolean_vars = ["True", "true", "t", "yes", 'y', 'on', "False", "false", 'f', 'no', 'n', 'off']
     data_type_words = ["bool", "float", "int", "length"]
-    for p in all_parts:
+    for p in option_parts:
         if "match(" in p or "default(" in p:
             continue
         p = p.replace(")","").replace("(","")
@@ -280,9 +297,11 @@ def check_when_option(options):
             continue
         if p.isdigit():
             continue
-        used_vars[p] = {"original": p, "name": p}
+        if is_failed_when:
+            used_vars[p] = {"original": p, "name": p, "in_failed_when": True}
+        else:
+            used_vars[p] = {"original": p, "name": p}
     return used_vars
-
 
 def flatten_dict_list(d, parent_key='', sep='.'):
     items = {}

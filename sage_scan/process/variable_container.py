@@ -91,7 +91,7 @@ def find_undefined_vars(vc: VarCont, accum_vc: VarCont):
     for v1_name, v1_val in vc.used_vars.items():
         in_scoped_vars = False
         in_local_vars = False
-        in_set_vars = False  # check with set vars in the same task when vars is used in 'failed_when' 
+        in_set_vars = False  # check with set vars in the same task when vars is used in 'failed_when'
         if check_if_magic_vars(v1_name):
             continue
         for v2 in accum_vc.set_scoped_vars:
@@ -112,6 +112,11 @@ def find_undefined_vars(vc: VarCont, accum_vc: VarCont):
                 break
         if in_local_vars:
             continue
+        if v1_name in vc.set_scoped_vars:
+            set_value = vc.set_scoped_vars[v1_name]
+            if v1_name in set_value:
+                # this supports the case like (x = x + y)
+                continue
         if v1_val.get("in_failed_when", False):
             for v2 in vc.set_scoped_vars:
                 if check_if_defined(v1_name, v2):

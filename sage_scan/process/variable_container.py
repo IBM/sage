@@ -277,7 +277,7 @@ def check_when_option(options):
         for v in failed_when_value.values():
             all_parts.extend(re.split('[ |]', v))
     else:
-        all_parts = re.split('[ |]', failed_when_value)
+        all_parts = re.split('[ |]', f"{failed_when_value}")
     _used_vars = extract_when_option_var_name(all_parts, is_failed_when=True)
     used_vars |= _used_vars
     return used_vars

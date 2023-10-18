@@ -129,6 +129,7 @@ def find_undefined_vars(vc: VarCont, accum_vc: VarCont):
     return undefined_vars, vc.used_vars
 
 
+# return accum vc based on call tree
 def compute_accum_vc(call_tree, vc_arr, obj_key, obj_filepath):
     parents=[]
     parents = traverse_and_get_parents(obj_key, call_tree, parents)
@@ -142,6 +143,7 @@ def compute_accum_vc(call_tree, vc_arr, obj_key, obj_filepath):
     return accum_vc
 
 
+# return the list of parent obj key
 def traverse_and_get_parents(node_key, call_tree, parent_nodes):
     sibling = []
     for parent, child in call_tree:
@@ -233,6 +235,7 @@ def used_vars_in_task(task: Task):
     return all_used_vars
 
 
+# return var names
 def extract_var_parts(options: dict):
     vars_in_option = {}
     for o, ov in options.items():
@@ -362,13 +365,14 @@ def flatten_dict(d, parent_key='', sep='.'):
     return items
 
 
-def find_all_undefined_vars(call_tree, vc_arr, target_filepath):
+# return all undefined vars
+def find_all_undefined_vars(call_tree, vc_arr, target_filepath=""):
     undefined_vars = {}
     used_vars = {}
 
     accum_vc = VarCont()
     for vc in vc_arr.values():
-        if vc.filepath != target_filepath:
+        if target_filepath and vc.filepath != target_filepath:
             continue
         accum_vc = compute_accum_vc(call_tree, vc_arr, vc.obj_key, vc.filepath)
         und_vars, _used_vars = find_undefined_vars(vc, accum_vc)
@@ -378,6 +382,7 @@ def find_all_undefined_vars(call_tree, vc_arr, target_filepath):
     return undefined_vars, used_vars
 
 
+# return all declared vars
 def find_all_set_vars(pd: PlaybookData|TaskFileData, call_tree, vc_arr, check_point=None):
     if not call_tree:
         return {}, {}
@@ -399,6 +404,7 @@ def find_all_set_vars(pd: PlaybookData|TaskFileData, call_tree, vc_arr, check_po
     return all_set_vars, role_vars
 
 
+# return undefined var's value if the variable is defined in role_vars etc.
 def get_undefined_vars_value(set_vars, undefined_vars):
     defined_in_parents = {}
     for ud_name, val in undefined_vars.items():
@@ -407,6 +413,62 @@ def get_undefined_vars_value(set_vars, undefined_vars):
             _val["value"] = set_vars[ud_name]
             defined_in_parents[ud_name] = _val
     return defined_in_parents
+
+
+# return current and to_be variable name if the var name has "."
+def detect_nested_var_name(var_names):
+    change_vars = {}
+    for var_name in var_names:
+        # TODO: consider proper condition for replacing var name
+        if "." in var_name:
+            to_be = var_name.replace(".", "_")
+            change_vars[var_name] = to_be
+    return change_vars
+
+
+# replace vars in task spec
+def replace_vars_in_task(task: Task, change_vars):
+    new_task = copy.copy(task)
+    yaml_lines = task.yaml_lines
+    for var, to_be_var in change_vars.items():
+        new_task.module_options = replace_vars(new_task.module_options, var, to_be_var)
+        new_task.options = replace_vars(new_task.options, var, to_be_var)
+        yaml_lines = yaml_lines.replace(var, to_be_var)
+    new_task.yaml_lines = yaml_lines
+    return new_task
+
+
+# return new data with to_be value
+def replace_vars(data, current, to_be):
+    if isinstance(data, dict):
+        for key, value in data.items():
+            if isinstance(value, str):
+                data[key] = value.replace(current, to_be)
+            else:
+                replace_vars(value, current, to_be)
+    elif isinstance(data, list):
+        for i, item in enumerate(data):
+            if isinstance(item, str):
+                data[i] = item.replace(current, to_be)
+            else:
+                replace_vars(item, current, to_be)
+    elif isinstance(data, str):
+        data = data.replace(current, to_be)
+    return data
+
+
+# this is temporary func
+def __update_tasks_in_pd(pd:PlaybookData|TaskFileData, change_vars):
+    tasks = []
+    update_tasks = []
+    if isinstance(pd, PlaybookData):
+        tasks = pd.get_tasks_in_this_playbook()
+    if isinstance(pd, TaskFileData):
+        tasks = pd.get_tasks_in_this_taskfile()
+    for task in tasks:
+        new_task = replace_vars_in_task(task, change_vars)
+        update_tasks.append(vars(new_task))
+    return update_tasks
 
 
 def get_set_vars_from_data(pd: PlaybookData|TaskFileData):
@@ -489,13 +551,16 @@ def main():
     results = []
     for pd in pbdata_arr:
         set_vars, role_vars, used_vars, undefined_vars_in_obj, undefined_vars_value = resolve_variables(pd)
+        change_vars = detect_nested_var_name(undefined_vars_in_obj.keys())
+        update_tasks = __update_tasks_in_pd(pd, change_vars)
         result = {
             "entrypoint": pd.object.key,
             "set_vars": set_vars,
             "role_vars": role_vars,
             "used_vars": used_vars,
             "undefined_vars_in_pddata": undefined_vars_in_obj,
-            "undefined_vars_value": undefined_vars_value 
+            "undefined_vars_value": undefined_vars_value,
+            "update_tasks": update_tasks
         }
         results.append(json.dumps(result))
 

@@ -115,7 +115,7 @@ def find_undefined_vars(vc: VarCont, accum_vc: VarCont):
             continue
         if v1_name in vc.set_scoped_vars:
             set_value = vc.set_scoped_vars[v1_name]
-            if v1_name in set_value:
+            if type(set_value) is str and v1_name in set_value:
                 # this supports the case like (x = x + y)
                 continue
         if v1_val.get("in_failed_when", False):
@@ -279,7 +279,7 @@ def check_when_option(options):
     elif type(failed_when_value) == dict:
         for v in failed_when_value.values():
             all_parts.extend(re.split('[ |]', v))
-    else:
+    elif type(failed_when_value) == str:
         all_parts = re.split('[ |]', failed_when_value)
     _used_vars = extract_when_option_var_name(all_parts, is_failed_when=True)
     used_vars |= _used_vars
@@ -426,6 +426,9 @@ def detect_nested_var_name(var_names):
     return change_vars
 
 
+# def check_possibility_to_flatten_vars(set_vars, used_vars):
+#     return
+
 # replace vars in task spec
 def replace_vars_in_task(task: Task, change_vars):
     new_task = copy.copy(task)
@@ -467,10 +470,11 @@ def __update_tasks_in_pd(pd:PlaybookData|TaskFileData, change_vars):
         tasks = pd.get_tasks_in_this_taskfile()
     for task in tasks:
         new_task = replace_vars_in_task(task, change_vars)
-        update_tasks.append(vars(new_task))
+        update_tasks.append(new_task.yaml_lines)
     return update_tasks
 
 
+# return declared vars in the file and role vars
 def get_set_vars_from_data(pd: PlaybookData|TaskFileData):
     call_tree = pd.call_tree
     call_seq = pd.call_seq
@@ -479,6 +483,7 @@ def get_set_vars_from_data(pd: PlaybookData|TaskFileData):
     return set_vars, role_vars
 
 
+# return all used vars in the file
 def get_used_vars_from_data(pd: PlaybookData|TaskFileData):
     call_tree = pd.call_tree
     call_seq = pd.call_seq
@@ -487,6 +492,7 @@ def get_used_vars_from_data(pd: PlaybookData|TaskFileData):
     return used_vars
 
 
+# return undefined vars in the file
 def get_undefined_vars_in_obj_from_data(pd: PlaybookData|TaskFileData):
     call_tree = pd.call_tree
     call_seq = pd.call_seq
@@ -495,6 +501,7 @@ def get_undefined_vars_in_obj_from_data(pd: PlaybookData|TaskFileData):
     return undefined_vars_in_obj
 
 
+# return found values of undefined vars
 def get_undefined_vars_value_from_data(pd: PlaybookData|TaskFileData):
     call_tree = pd.call_tree
     call_seq = pd.call_seq

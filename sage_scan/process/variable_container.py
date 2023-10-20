@@ -221,6 +221,7 @@ def get_vc_from_task(task: Task):
 
 # return used vars in a task
 def used_vars_in_task(task: Task):
+    name = task.name
     options = task.options
     module_options = task.module_options
     flat_options = flatten_dict_list(options)
@@ -228,23 +229,31 @@ def used_vars_in_task(task: Task):
     vars_in_options = extract_var_parts(flat_options)
     special_vars = check_when_option(options)
     vars_in_module_options = extract_var_parts(flat_module_options)
+    vars_in_name = extract_var_parts(name)
     all_used_vars = {}
     all_used_vars |= vars_in_options
     all_used_vars |= vars_in_module_options
     all_used_vars |= special_vars
+    all_used_vars |= vars_in_name
     return all_used_vars
 
 
 # return var names
-def extract_var_parts(options: dict):
+def extract_var_parts(options: dict|str):
     vars_in_option = {}
-    for o, ov in options.items():
-        if type(ov) != str:
-            continue
-        if "{{" in ov:
-            vars = extract_variable_names(ov)
+    if isinstance(options, str):
+        if "{{" in options:
+            vars = extract_variable_names(options)
             for v in vars:
                 vars_in_option[v["name"]] = v
+    else:
+        for _, ov in options.items():
+            if type(ov) != str:
+                continue
+            if "{{" in ov:
+                vars = extract_variable_names(ov)
+                for v in vars:
+                    vars_in_option[v["name"]] = v
     return vars_in_option
 
 
@@ -359,6 +368,41 @@ def flatten_dict(d, parent_key='', sep='.'):
         else:
             items[new_key] = value
     return items
+
+
+# def check_possibility_to_flatten_vars(set_vars, used_vars):
+#     return
+
+
+# replace vars in task
+def replace_vars_in_task(task: Task, change_vars):
+    new_task = copy.copy(task)
+    yaml_lines = task.yaml_lines
+    for var, to_be_var in change_vars.items():
+        new_task.module_options = replace_vars(new_task.module_options, var, to_be_var)
+        new_task.options = replace_vars(new_task.options, var, to_be_var)
+        yaml_lines = yaml_lines.replace(var, to_be_var)
+    new_task.yaml_lines = yaml_lines
+    return new_task
+
+
+# return new data with to_be value
+def replace_vars(data, current, to_be):
+    if isinstance(data, dict):
+        for key, value in data.items():
+            if isinstance(value, str):
+                data[key] = value.replace(current, to_be)
+            else:
+                replace_vars(value, current, to_be)
+    elif isinstance(data, list):
+        for i, item in enumerate(data):
+            if isinstance(item, str):
+                data[i] = item.replace(current, to_be)
+            else:
+                replace_vars(item, current, to_be)
+    elif isinstance(data, str):
+        data = data.replace(current, to_be)
+    return data
 
 
 # return all undefined vars

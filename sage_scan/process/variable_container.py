@@ -299,7 +299,7 @@ def extract_when_option_var_name(option_parts, is_failed_when=False):
     for p in option_parts:
         if "match(" in p or "default(" in p:
             continue
-        p = p.replace(")","").replace("(","")
+        p = p.replace(")","").replace("(","").replace("{", "").replace("}", "")
         if not p:
             continue
         if "=" in p or "<" in p or ">" in p:

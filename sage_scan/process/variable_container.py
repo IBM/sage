@@ -293,7 +293,7 @@ def check_when_option(options):
 
 def extract_when_option_var_name(option_parts, is_failed_when=False):
     used_vars = {}
-    ignore_words = ["defined", "undefined", "is", "not", "and", "or", "|", "in", "none"]
+    ignore_words = ["defined", "undefined", "is", "not", "and", "or", "|", "in", "none", "item"]
     boolean_vars = ["True", "true", "t", "yes", 'y', 'on', "False", "false", 'f', 'no', 'n', 'off']
     data_type_words = ["bool", "float", "int", "length"]
     for p in option_parts:
@@ -312,7 +312,10 @@ def extract_when_option_var_name(option_parts, is_failed_when=False):
             continue
         if p.startswith('"') or p.startswith("'"):
             continue
+        p = p.replace("\"", "")
         if p.isdigit():
+            continue
+        if check_if_magic_vars(p):
             continue
         if is_failed_when:
             used_vars[p] = {"original": p, "name": p, "in_failed_when": True}

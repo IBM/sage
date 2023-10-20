@@ -35,7 +35,7 @@ class VarCont:
         return self.used_vars
 
 
-# return VarCont
+# generate VarCont from sage obj
 def to_vc(obj):
     vc = None
     if isinstance(obj, Playbook):
@@ -115,7 +115,7 @@ def find_undefined_vars(vc: VarCont, accum_vc: VarCont):
             continue
         if v1_name in vc.set_scoped_vars:
             set_value = vc.set_scoped_vars[v1_name]
-            if v1_name in set_value:
+            if type(set_value) is str and v1_name in set_value:
                 # this supports the case like (x = x + y)
                 continue
         if v1_val.get("in_failed_when", False):
@@ -129,6 +129,7 @@ def find_undefined_vars(vc: VarCont, accum_vc: VarCont):
     return undefined_vars, vc.used_vars
 
 
+# return accum vc based on call tree
 def compute_accum_vc(call_tree, vc_arr, obj_key, obj_filepath):
     parents=[]
     parents = traverse_and_get_parents(obj_key, call_tree, parents)
@@ -142,6 +143,7 @@ def compute_accum_vc(call_tree, vc_arr, obj_key, obj_filepath):
     return accum_vc
 
 
+# return the list of parent obj key
 def traverse_and_get_parents(node_key, call_tree, parent_nodes):
     sibling = []
     for parent, child in call_tree:
@@ -233,6 +235,7 @@ def used_vars_in_task(task: Task):
     return all_used_vars
 
 
+# return var names
 def extract_var_parts(options: dict):
     vars_in_option = {}
     for o, ov in options.items():
@@ -242,10 +245,6 @@ def extract_var_parts(options: dict):
             vars = extract_variable_names(ov)
             for v in vars:
                 vars_in_option[v["name"]] = v
-            # for var in vars:
-            #     var["value_type"] = type
-            #     var["key"] = o
-            #     vars_in_option.append(var)
     return vars_in_option
 
 
@@ -362,13 +361,14 @@ def flatten_dict(d, parent_key='', sep='.'):
     return items
 
 
+# return all undefined vars
 def find_all_undefined_vars(call_tree, vc_arr, target_filepath):
     undefined_vars = {}
     used_vars = {}
 
     accum_vc = VarCont()
     for vc in vc_arr.values():
-        if vc.filepath != target_filepath:
+        if target_filepath and vc.filepath != target_filepath:
             continue
         accum_vc = compute_accum_vc(call_tree, vc_arr, vc.obj_key, vc.filepath)
         und_vars, _used_vars = find_undefined_vars(vc, accum_vc)
@@ -378,6 +378,7 @@ def find_all_undefined_vars(call_tree, vc_arr, target_filepath):
     return undefined_vars, used_vars
 
 
+# return all declared vars
 def find_all_set_vars(pd: PlaybookData|TaskFileData, call_tree, vc_arr, check_point=None):
     if not call_tree:
         return {}, {}
@@ -399,6 +400,7 @@ def find_all_set_vars(pd: PlaybookData|TaskFileData, call_tree, vc_arr, check_po
     return all_set_vars, role_vars
 
 
+# return undefined var's value if the variable is defined in role_vars etc.
 def get_undefined_vars_value(set_vars, undefined_vars):
     defined_in_parents = {}
     for ud_name, val in undefined_vars.items():
@@ -409,6 +411,7 @@ def get_undefined_vars_value(set_vars, undefined_vars):
     return defined_in_parents
 
 
+# return declared vars in the file and role vars
 def get_set_vars_from_data(pd: PlaybookData|TaskFileData):
     call_tree = pd.call_tree
     call_seq = pd.call_seq

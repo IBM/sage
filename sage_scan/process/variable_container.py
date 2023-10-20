@@ -246,7 +246,7 @@ def extract_var_parts(options: dict|str):
             vars = extract_variable_names(options)
             for v in vars:
                 vars_in_option[v["name"]] = v
-    else:
+    elif isinstance(options, dict):
         for _, ov in options.items():
             if type(ov) != str:
                 continue

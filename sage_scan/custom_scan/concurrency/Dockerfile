@@ -11,7 +11,7 @@ COPY poetry.lock pyproject.toml ./
 RUN apt-get clean && apt-get update && \
     apt-get install -y sudo && \
     pip install -U pip && \
-    pip install git+https://github.com/IBM/sage.git@3104005fce05ea1706e2046e8df7fc76acd96fd2 && \
+    pip install git+https://github.com/IBM/sage.git@4456c63f02d9f4db5a4fca1386cb12f4e103ea25 && \
     curl -sSL https://install.python-poetry.org | python3 - && \
     poetry config virtualenvs.create false && \
     poetry install --no-dev

@@ -48,6 +48,10 @@ def prepare_source_dir(root_dir, src_json):
             if repo_name in ignore_list:
                 continue
             path = content.get("path")
+            if path == "":
+                path = "example.yml"
+            elif path.endswith(".py"):
+                path = path[:-3] + ".yml"
             text = content.get("text")
             if not text:
                 text = content.get("content")

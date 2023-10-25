@@ -380,6 +380,20 @@ def flatten_dict(d, parent_key='', sep='.'):
     return items
 
 
+def filter_complex_name_vars(used_vars):
+    simple_used_vars = copy.copy(used_vars)
+    for var_name in used_vars:
+        if not var_name in simple_used_vars:
+            continue
+        if "[" in var_name:
+            simple_used_vars.pop(var_name)
+        elif "(" in var_name:
+            simple_used_vars.pop(var_name)
+        elif "=" in var_name:
+            simple_used_vars.pop(var_name)
+    return simple_used_vars
+
+
 # def check_possibility_to_flatten_vars(set_vars, used_vars):
 #     return
 
@@ -500,6 +514,8 @@ def get_undefined_vars_in_obj_from_data(pd: PlaybookData|TaskFileData):
     call_seq = pd.call_seq
     vc_arr = make_vc_arr(call_seq)
     undefined_vars_in_obj, _ = find_all_undefined_vars(call_tree, vc_arr, pd.object.filepath)
+    # TODO: this part will be removed when var name extraction becomes robust.
+    undefined_vars_in_obj = filter_complex_name_vars(undefined_vars_in_obj)
     return undefined_vars_in_obj
 
 

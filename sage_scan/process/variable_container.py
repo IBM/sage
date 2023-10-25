@@ -33,6 +33,13 @@ class VarCont:
     
     def get_used_vars(self):
         return self.used_vars
+    
+    def get_set_vars_in_obj(self):
+        set_vars = {}
+        set_vars |= self.set_explicit_scoped_vars
+        set_vars |= self.set_scoped_vars
+        set_vars |= self.set_local_vars
+        return set_vars
 
 
 # generate VarCont from sage obj
@@ -450,12 +457,25 @@ def find_all_set_vars(pd: PlaybookData|TaskFileData, call_tree, vc_arr, check_po
 # return undefined var's value if the variable is defined in role_vars etc.
 def get_undefined_vars_value(set_vars, undefined_vars):
     defined_in_parents = {}
+    no_value_vars = {}
     for ud_name, val in undefined_vars.items():
         if ud_name in set_vars:
             _val = copy.copy(val)
             _val["value"] = set_vars[ud_name]
             defined_in_parents[ud_name] = _val
-    return defined_in_parents
+        else:
+            no_value_vars[ud_name] = None
+    return defined_in_parents, no_value_vars
+
+
+def get_play_vars_from_data(pd: PlaybookData|TaskFileData):
+    set_vars = {}
+    call_seq = pd.call_seq
+    for obj in call_seq:
+        if isinstance(obj, Play):
+            vc = get_vc_from_play(obj)
+            set_vars = vc.get_set_vars_in_obj()
+    return set_vars
 
 
 # return declared vars in the file and role vars
@@ -483,13 +503,23 @@ def get_undefined_vars_in_obj_from_data(pd: PlaybookData|TaskFileData):
     return undefined_vars_in_obj
 
 
+def get_used_vars_with_no_value_from_data(pd: PlaybookData|TaskFileData):
+    call_tree = pd.call_tree
+    call_seq = pd.call_seq
+    vc_arr = make_vc_arr(call_seq)
+    set_vars = find_all_set_vars(pd, call_tree, vc_arr)
+    undefined_vars_in_obj, _ = find_all_undefined_vars(call_tree, vc_arr, pd.object.filepath)
+    _, no_value_vars = get_undefined_vars_value(set_vars, undefined_vars_in_obj)
+    return no_value_vars
+
+
 def get_undefined_vars_value_from_data(pd: PlaybookData|TaskFileData):
     call_tree = pd.call_tree
     call_seq = pd.call_seq
     vc_arr = make_vc_arr(call_seq)
     set_vars = find_all_set_vars(pd, call_tree, vc_arr)
     undefined_vars_in_obj, _ = find_all_undefined_vars(call_tree, vc_arr, pd.object.filepath)
-    undefined_vars_value = get_undefined_vars_value(set_vars, undefined_vars_in_obj)
+    undefined_vars_value, _ = get_undefined_vars_value(set_vars, undefined_vars_in_obj)
     return undefined_vars_value
 
 
@@ -499,7 +529,7 @@ def resolve_variables(pd: PlaybookData|TaskFileData):
     vc_arr = make_vc_arr(call_seq)
     set_vars, role_vars = find_all_set_vars(pd, call_tree, vc_arr)
     undefined_vars_in_obj, used_vars = find_all_undefined_vars(call_tree, vc_arr, pd.object.filepath)
-    undefined_vars_value = get_undefined_vars_value(set_vars, undefined_vars_in_obj)
+    undefined_vars_value, _ = get_undefined_vars_value(set_vars, undefined_vars_in_obj)
     return set_vars, role_vars, used_vars, undefined_vars_in_obj, undefined_vars_value
 
 

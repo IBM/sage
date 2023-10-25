@@ -51,6 +51,9 @@ def prepare_source_dir(root_dir, src_json):
             if path == "":
                 path = "example.yml"
             elif path.endswith(".py"):
+                # to support a module example task file which is saved as `<module>.py` 
+                # while its content is a task YAML, we replace `.py` with `.yml`
+                # so that sage can correctly scan it as task YAML file.
                 path = path[:-3] + ".yml"
             text = content.get("text")
             if not text:

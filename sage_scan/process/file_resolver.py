@@ -24,9 +24,10 @@ def find_file_obj(fc: FileCont, objects):
     for obj in objects:
         if not isinstance(obj, File):
             continue
-        current_dir = fc.current_filepath.rsplit("/", 1)[0]
+        current_dir = os.path.dirname(fc.current_filepath)
         relative_path = os.path.relpath(obj.filepath, current_dir)
-        if fc.used_file == relative_path:
+        norm_used_file = os.path.normpath(fc.used_file)
+        if norm_used_file == relative_path:
             return obj
     return None
 
@@ -86,10 +87,10 @@ def main():
         for task in tasks:
             fc = resolve_file(task, file_objs)
             if fc:
-                results.append(jsonpickle.encode(fc,make_refs=False))
+                results.append(jsonpickle.encode(fc,make_refs=False) + "\n")
 
     with open(args.output, "w") as f:
-        f.write("\n".join(results))
+        f.write("".join(results))
 
 if __name__ == "__main__":
     main()

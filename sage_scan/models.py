@@ -27,6 +27,7 @@ from ansible_risk_insight.models import (
     Playbook as ARIPlaybook,
     Play as ARIPlay,
     Collection as ARICollection,
+    File as ARIFile,
     Repository as ARIRepository,
     Annotation,
     BecomeInfo,
@@ -88,6 +89,7 @@ class SageObject(object):
             "playbook": ARIPlaybook,
             "play": ARIPlay,
             "collection": ARICollection,
+            "file": ARIFile,
             "project": ARIRepository,
         }
         cls = cls_mapping.get(type_str, None)
@@ -302,6 +304,20 @@ class Collection(SageObject):
 
 
 @dataclass
+class File(SageObject):
+    type: str = "file"
+    key: str = ""
+    name: str = ""
+    role: str = ""
+    collection: str = ""
+    body: str = ""
+    data: any = None
+    error: str = ""
+    label: str = ""
+    filepath: str = ""
+
+
+@dataclass
 class Project(SageObject):
     type: str = "project"
     key: str = ""
@@ -323,6 +339,7 @@ class Project(SageObject):
     modules: list = field(default_factory=list)
     taskfiles: list = field(default_factory=list)
     inventories: list = field(default_factory=list)
+    files: list = field(default_factory=list)
     version: str = ""
 
     @classmethod
@@ -347,6 +364,8 @@ def convert_to_sage_obj(ari_obj, source: dict={}):
         return Play.from_ari_obj(ari_obj, source)
     elif isinstance(ari_obj, ARICollection):
         return Collection.from_ari_obj(ari_obj, source)
+    elif isinstance(ari_obj, ARIFile):
+        return File.from_ari_obj(ari_obj, source)
     elif isinstance(ari_obj, ARIRepository):
         return Project.from_ari_obj(ari_obj, source)
     else:
@@ -368,6 +387,8 @@ def convert_to_ari_obj(sage_obj):
         return Play.to_ari_obj(sage_obj)
     elif isinstance(sage_obj, Collection):
         return Collection.to_ari_obj(sage_obj)
+    elif isinstance(sage_obj, File):
+        return File.to_ari_obj(sage_obj)
     elif isinstance(sage_obj, Project):
         return Project.to_ari_obj(sage_obj)
     else:
@@ -401,6 +422,7 @@ class SageProject(object):
     roles: list = field(default_factory=list)
     taskfiles: list = field(default_factory=list)
     tasks: list = field(default_factory=list)
+    files: list = field(default_factory=list)
 
     path: str = ""
     scan_timestamp: str = ""

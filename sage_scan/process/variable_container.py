@@ -529,11 +529,13 @@ def get_used_vars_with_no_value_from_data(pd: PlaybookData|TaskFileData):
     return no_value_vars
 
 
-def get_undefined_vars_value_from_data(pd: PlaybookData|TaskFileData):
+def get_undefined_vars_value_from_data(pd: PlaybookData|TaskFileData, extra_set_vars: dict={}):
     call_tree = pd.call_tree
     call_seq = pd.call_seq
     vc_arr = make_vc_arr(call_seq)
-    set_vars = find_all_set_vars(pd, call_tree, vc_arr)
+    set_vars, _ = find_all_set_vars(pd, call_tree, vc_arr)
+    if extra_set_vars:
+        set_vars.update(extra_set_vars)
     undefined_vars_in_obj, _ = find_all_undefined_vars(call_tree, vc_arr, pd.object.filepath)
     undefined_vars_value, _ = get_undefined_vars_value(set_vars, undefined_vars_in_obj)
     return undefined_vars_value

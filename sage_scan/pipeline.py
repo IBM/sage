@@ -719,9 +719,16 @@ class SagePipeline(object):
                         annotation_dict[spec_key] = annotations
 
             ari_objects = findings.root_definitions.get("definitions", {})
+            tasks = ari_objects["tasks"]
             for obj_type in ari_objects:
                 ari_objects_per_type = ari_objects[obj_type]
                 for ari_obj in ari_objects_per_type:
+
+                    # filter files to avoid too many files in sage-objects
+                    if obj_type == "files":
+                        if is_skip_file_obj(ari_obj, tasks):
+                            continue
+
                     ari_spec_key = ari_obj.key
                     sage_obj = convert_to_sage_obj(ari_obj, source)
                     if source:
@@ -1014,3 +1021,42 @@ def get_dir_size(path=""):
             elif entry.is_dir(follow_symlinks=False):
                 total += get_dir_size(entry.path)
     return total
+
+
+# NOTE: currently we keep just files that are obviously for vars with a certain path
+#       and vars files that are explicitly used in some tasks; other types of files will be skipped
+def is_skip_file_obj(obj, tasks=[]):
+    if not obj or getattr(obj, "type", "") != "file":
+        return True
+    
+    fpath = getattr(obj, "defined_in") or getattr(obj, "filepath")
+    if not fpath:
+        return True
+    
+    vars_file_patterns = [
+        "vars/main.yml",
+        "vars/main.yaml",
+        "defaults/main.yml",
+        "defaults/main.yaml",
+    ]
+    # check if the filepath is one of role vars files
+    for p in vars_file_patterns:
+        if p in fpath:
+            return False
+    
+    # check if the filepath is likely called from known tasks
+    for t in tasks:
+        module = getattr(t, "module")
+        short_module = module.split(".")[-1]
+        if short_module != "include_vars":
+            continue
+        mo = getattr(t, "module_options")
+        if not isinstance(mo, str):
+            continue
+        basename = mo.split("/")[-1]
+        if basename in fpath:
+            return False
+        
+    return  True
+
+

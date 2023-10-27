@@ -404,6 +404,7 @@ attr_list = [
     "roles",
     "taskfiles",
     "tasks",
+    "files",
 ]
 
 

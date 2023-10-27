@@ -136,7 +136,7 @@ class SagePipeline(object):
     ari_include_tests: bool = True
     ari_objects: bool = False
 
-    accumulate: bool = True
+    accumulate: bool = False
     scan_records: dict = field(default_factory=dict)
 
     # special scan records

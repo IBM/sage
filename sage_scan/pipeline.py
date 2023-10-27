@@ -136,7 +136,7 @@ class SagePipeline(object):
     ari_include_tests: bool = True
     ari_objects: bool = False
 
-    accumulate: bool = True
+    accumulate: bool = False
     scan_records: dict = field(default_factory=dict)
 
     # special scan records
@@ -196,9 +196,10 @@ class SagePipeline(object):
             return self._target_dir_to_input(target_dir)
         elif isinstance(kwargs, dict) and "raw_yaml" in kwargs:
             raw_yaml = kwargs["raw_yaml"]
+            yaml_label = kwargs.get("yaml_label", "")
             self.scan_records["single_scan"] = True
             self.scan_records["source"] = kwargs.get("source", {})
-            return self._single_yaml_to_input(raw_yaml)
+            return self._single_yaml_to_input(raw_yaml=raw_yaml, label=yaml_label)
         elif isinstance(kwargs, dict) and "ftdata_path" in kwargs:
             ftdata_path = kwargs["ftdata_path"]
             return self._ftdata_to_input(ftdata_path)
@@ -295,10 +296,11 @@ class SagePipeline(object):
 
         return input_list
 
-    def _single_yaml_to_input(self, raw_yaml):
-        label, _, error = label_yml_file(yml_body=raw_yaml)
-        if error:
-            raise ValueError(f"failed to detect the input YAML type: {error}")
+    def _single_yaml_to_input(self, raw_yaml, label=""):
+        if not label:
+            label, _, error = label_yml_file(yml_body=raw_yaml)
+            if error:
+                raise ValueError(f"failed to detect the input YAML type: {error}")
         if label not in ["playbook", "taskfile"]:
             raise ValueError(f"playbook and taskfile are the only supported types, but the input file is `{label}`")
         input_data = InputData(

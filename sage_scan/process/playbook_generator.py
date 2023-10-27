@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from sage_scan.models import Playbook, Task, Play
+from sage_scan.models import Task
 import ansible_risk_insight.yaml as ariyaml
 from ruamel.yaml.scalarstring import DoubleQuotedScalarString
 

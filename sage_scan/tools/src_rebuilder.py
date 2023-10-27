@@ -36,8 +36,7 @@ def prepare_source_dir(root_dir, src_json):
         "ugns/ansible-ssg",
     ]
     
-    yaml_file_contents = load_json_data(src_json)
-    for content in yaml_file_contents:
+    for content in load_json_data(src_json):
         if "namespace_name" in content:
             type = "collection_role"
         else:
@@ -155,12 +154,12 @@ def load_source_data_per_project(filepath):
 
 def load_json_data(filepath):
     with open(filepath, "r") as file:
-        records = file.readlines()
-    trains = []
-    for record in records:
-        train = json.loads(record)
-        trains.append(train)
-    return trains
+        for line in file:
+            record = json.loads(line)
+            if not record:
+                continue
+            yield record
+
 
 def write_result(filepath, results):
     with open(filepath, "w") as file:

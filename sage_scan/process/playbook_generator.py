@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from sage_scan.models import Playbook, Task
+from sage_scan.models import Playbook, Task, Play
 import ansible_risk_insight.yaml as ariyaml
 from ruamel.yaml.scalarstring import DoubleQuotedScalarString
 
@@ -74,6 +74,8 @@ class PlaybookGenerator(object):
                 play_data["name"] = play.name
             play_data.update(play.options)
             vars = {}
+            if play.variables:
+                vars = play.variables
             for k, v in self.vars.items():
                 vars[k] = v
             if vars:

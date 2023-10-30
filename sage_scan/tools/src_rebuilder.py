@@ -37,75 +37,45 @@ def prepare_source_dir(root_dir, src_json):
     ]
     
     for content in load_json_data(src_json):
-        if "namespace_name" in content:
-            type = "collection_role"
-        else:
-            type = "project"
-
-        if type == "project":
-            repo_name = content.get("repo_name")
-            if repo_name in ignore_list:
-                continue
-            path = content.get("path")
-            if path == "":
-                path = "example.yml"
-            elif path.endswith(".py"):
-                # to support a module example task file which is saved as `<module>.py` 
-                # while its content is a task YAML, we replace `.py` with `.yml`
-                # so that sage can correctly scan it as task YAML file.
-                path = path[:-3] + ".yml"
-            text = content.get("text")
-            if not text:
-                text = content.get("content")
-            license = content.get("license")
-            target_dir = os.path.join(root_dir, repo_name)
-            if not os.path.exists(target_dir):
-                os.makedirs(target_dir)
-            target_file = os.path.join(target_dir, path.lstrip("/"))
-            print(f"exporting yaml file {target_file}")
-            target_file_dir = extract_directory(target_file)
-            try:
-                if not os.path.exists(target_file_dir):
-                    os.makedirs(target_file_dir)
-                with open(target_file, "w") as file:
-                    file.write(text)
-                path_list.append({
-                    "repo_type": type,
-                    "repo_name": repo_name,
-                    "source": "",
-                    "license": license,
-                    "path": path,
-                })
-            except Exception as e:
-                print(e)
-        if type == "collection_role":
-            namespace_name = content.get("namespace_name")
-            path = content.get("path")
-            if path == "":
-                path = "example.yml"
-            # TODO: find a better way
-            elif path.endswith(".py"):
-                path = path[:-3] + ".yml"
-            text = content.get("text")
-            source = content.get("source")
-            license = content.get("license")
+        repo_name = content.get("repo_name")
+        if not repo_name and "namespace_name" in content:
+            repo_name = content.get("namespace_name")
+        if repo_name in ignore_list:
+            continue
+        path = content.get("path")
+        if path == "":
+            path = "example.yml"
+        elif path.endswith(".py"):
+            # to support a module example task file which is saved as `<module>.py` 
+            # while its content is a task YAML, we replace `.py` with `.yml`
+            # so that sage can correctly scan it as task YAML file.
+            path = path[:-3] + ".yml"
+        text = content.get("text")
+        if not text:
+            text = content.get("content")
+        source = content.get("source")
+        license = content.get("license")
+        _type = content.get("type")
+        target_dir = os.path.join(root_dir, repo_name)
+        if not os.path.exists(target_dir):
+            os.makedirs(target_dir)
+        target_file = os.path.join(target_dir, path.lstrip("/"))
+        print(f"exporting yaml file {target_file}")
+        target_file_dir = extract_directory(target_file)
+        try:
+            if not os.path.exists(target_file_dir):
+                os.makedirs(target_file_dir)
+            with open(target_file, "w") as file:
+                file.write(text)
             path_list.append({
-                "repo_type": type,
-                "repo_name": namespace_name,
+                "repo_type": _type,
+                "repo_name": repo_name,
                 "source": source,
                 "license": license,
                 "path": path,
             })
-            target_dir = os.path.join(root_dir, namespace_name)
-            if not os.path.exists(target_dir):
-                os.makedirs(target_dir)
-            target_file = os.path.join(target_dir, path)
-            target_file_dir = extract_directory(target_file)
-            if not os.path.exists(target_file_dir):
-                os.makedirs(target_file_dir)
-            with open(target_file, "w") as file:
-                # print(f"exporting yaml file {target_file}")
-                file.write(text)
+        except Exception as e:
+            print(e)
     return path_list
 
 def extract_directory(file_path):

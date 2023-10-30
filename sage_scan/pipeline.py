@@ -19,7 +19,7 @@ import datetime
 from ansible_risk_insight.scanner import ARIScanner, config, Config
 from ansible_risk_insight.models import NodeResult, RuleResult, AnsibleRunContext, Object
 from ansible_risk_insight.finder import (
-    find_all_ymls,
+    find_all_files,
     label_yml_file,
     get_role_info_from_path,
     get_project_info_for_file,
@@ -122,7 +122,7 @@ class SagePipeline(object):
     # whether it scans the targets in parallel: default to False
     do_parallel: bool = False
 
-    do_save_yml_inventory: bool = True
+    do_save_file_inventory: bool = True
     do_save_findings: bool = False
     do_save_metadata: bool = True
     do_save_objects: bool = True
@@ -140,7 +140,7 @@ class SagePipeline(object):
     scan_records: dict = field(default_factory=dict)
 
     # special scan records
-    yml_inventory: list = field(default_factory=list)
+    file_inventory: list = field(default_factory=list)
 
     def __post_init__(self):
         if not self.logger:
@@ -218,17 +218,19 @@ class SagePipeline(object):
     def _target_dir_to_input(self, target_dir):
         dir_size = get_dir_size(target_dir)
         path_list = get_yml_list(target_dir)
-        project_file_list, role_file_list, independent_file_list = create_scan_list(path_list)
+        project_file_list, role_file_list, independent_file_list, non_yaml_file_list = create_scan_list(path_list)
         # used for detecting missing files at the 1st scan
         self.scan_records["project_file_list"] = project_file_list
         self.scan_records["role_file_list"] = role_file_list
         self.scan_records["independent_file_list"] = independent_file_list
+        self.scan_records["non_yaml_file_list"] = non_yaml_file_list
         self.scan_records["non_task_scanned_files"] = []
         self.scan_records["findings"] = []
         self.scan_records["metadata"] = {}
         self.scan_records["time"] = []
         self.scan_records["size"] = dir_size
         self.scan_records["objects"] = []
+        self.scan_records["ignored_files"] = []
 
         num = len(project_file_list) + len(role_file_list) + len(independent_file_list)
         target_counts = []
@@ -401,20 +403,20 @@ class SagePipeline(object):
             scan_func = kwargs["scan_func"]
             scan_func(input_list)
 
-        # create yml inventory here, but this will be updated after scanning
-        self.yml_inventory = self.create_yml_inventory()
+        # create file inventory here, but this will be updated after scanning
+        self.file_inventory = self.create_file_inventory()
 
         multi_stage = self.do_multi_stage
         if "single_scan" in self.scan_records and self.scan_records["single_scan"]:
             multi_stage = False
-        yml_inventory_only = False
-        if isinstance(kwargs, dict) and "yml_inventory_only" in kwargs:
-            yml_inventory_only = kwargs["yml_inventory_only"]
-        if yml_inventory_only:
+        file_inventory_only = False
+        if isinstance(kwargs, dict) and "file_inventory_only" in kwargs:
+            file_inventory_only = kwargs["file_inventory_only"]
+        if file_inventory_only:
             self.check_timeout()
-            if output_dir and self.do_save_yml_inventory:
-                yml_inventory_path = os.path.join(output_dir, "yml_inventory.json")
-                self.save_yml_inventory(yml_inventory_path)
+            if output_dir and self.do_save_file_inventory:
+                file_inventory_path = os.path.join(output_dir, "file_inventory.json")
+                self.save_file_inventory(file_inventory_path)
                 self.check_timeout()
             return
 
@@ -431,10 +433,10 @@ class SagePipeline(object):
             objects = process_fn(objects)
             self.scan_records["objects"] = objects
         
-        self.yml_inventory = self.create_yml_inventory()
-        if output_dir and self.do_save_yml_inventory:
-            yml_inventory_path = os.path.join(output_dir, "yml_inventory.json")
-            self.save_yml_inventory(yml_inventory_path)
+        self.file_inventory = self.create_file_inventory()
+        if output_dir and self.do_save_file_inventory:
+            file_inventory_path = os.path.join(output_dir, "file_inventory.json")
+            self.save_file_inventory(file_inventory_path)
             self.check_timeout()
 
         if output_dir and self.do_save_findings:
@@ -545,15 +547,17 @@ class SagePipeline(object):
             "project_file_list": {},
             "role_file_list": {},
             "independent_file_list": [],
+            "non_yaml_file_list": [],
             "non_task_scanned_files": [],
             "findings": [],
             "metadata": {},
             "time": [],
             "size": 0,
             "objects": [],
+            "ignored_files": [],
             "begin": time.time(),
         }
-        self.yml_inventory = []
+        self.file_inventory = []
         return
     
     def _clear_scan_records(self):
@@ -589,9 +593,12 @@ class SagePipeline(object):
                 display_name = display_name[:-1]
 
         yaml_label_list = []
-        if self.yml_inventory:
-            for file_info in self.yml_inventory:
+        if self.file_inventory:
+            for file_info in self.file_inventory:
                 if not isinstance(file_info, dict):
+                    continue
+                is_yml = file_info.get("is_yml", False)
+                if not is_yml:
                     continue
                 fpath = file_info.get("path_from_root", "")
                 label = file_info.get("label", "")
@@ -665,6 +672,7 @@ class SagePipeline(object):
             all_scanned_files = self.get_all_files_from_scandata(scandata, path)
             task_scanned_files = [fpath for fpath, scan_type in all_scanned_files if scan_type == "task"]
             play_scanned_files = [fpath for fpath, scan_type in all_scanned_files if scan_type == "play"]
+            file_scanned_files = [fpath for fpath, scan_type in all_scanned_files if scan_type == "file"]
             found_files = []
             if original_type == "project":
                 if name in self.scan_records["project_file_list"]:
@@ -674,9 +682,14 @@ class SagePipeline(object):
                         if fpath in task_scanned_files:
                             self.scan_records["project_file_list"][name]["files"][j]["task_scanned"] = True
                             self.scan_records["project_file_list"][name]["files"][j]["scanned_as"] = _type
+                            self.scan_records["project_file_list"][name]["files"][j]["loaded"] = True
                         elif fpath in play_scanned_files:
                             self.scan_records["project_file_list"][name]["files"][j]["scanned_as"] = _type
+                            self.scan_records["project_file_list"][name]["files"][j]["loaded"] = True
                             self.scan_records["non_task_scanned_files"].append(fpath)
+                        elif fpath in file_scanned_files:
+                            self.scan_records["project_file_list"][name]["files"][j]["scanned_as"] = _type
+                            self.scan_records["project_file_list"][name]["files"][j]["loaded"] = True
 
             elif original_type == "role":
                 if name in self.scan_records["role_file_list"]:
@@ -686,8 +699,10 @@ class SagePipeline(object):
                         if fpath in task_scanned_files:
                             self.scan_records["role_file_list"][name]["files"][j]["task_scanned"] = True
                             self.scan_records["role_file_list"][name]["files"][j]["scanned_as"] = _type
+                            self.scan_records["role_file_list"][name]["files"][j]["loaded"] = True
                         elif fpath in play_scanned_files:
                             self.scan_records["role_file_list"][name]["files"][j]["scanned_as"] = _type
+                            self.scan_records["role_file_list"][name]["files"][j]["loaded"] = True
                             self.scan_records["non_task_scanned_files"].append(fpath)
             else:
                 files_num = len(self.scan_records["independent_file_list"])
@@ -696,8 +711,10 @@ class SagePipeline(object):
                     if fpath in task_scanned_files:
                         self.scan_records["independent_file_list"][j]["task_scanned"] = True
                         self.scan_records["independent_file_list"][j]["scanned_as"] = _type
+                        self.scan_records["independent_file_list"][j]["loaded"] = True
                     elif fpath in play_scanned_files:
                         self.scan_records["independent_file_list"][j]["scanned_as"] = _type
+                        self.scan_records["independent_file_list"][j]["loaded"] = True
                         self.scan_records["non_task_scanned_files"].append(fpath)
 
             findings = scandata.findings
@@ -729,6 +746,7 @@ class SagePipeline(object):
                     # filter files to avoid too many files in sage-objects
                     if obj_type == "files":
                         if is_skip_file_obj(ari_obj, tasks):
+                            self.scan_records["ignored_files"].append(ari_obj.defined_in)
                             continue
 
                     ari_spec_key = ari_obj.key
@@ -775,17 +793,31 @@ class SagePipeline(object):
             fullpath = os.path.join(scan_root_dir, play_spec.defined_in)
             if fullpath not in all_files:
                 all_files.append((fullpath, "play"))
+
+        file_specs = scandata.root_definitions.get("definitions", {}).get("files", [])
+        for file_spec in file_specs:
+            fullpath = os.path.join(scan_root_dir, file_spec.defined_in)
+            if fullpath not in all_files:
+                all_files.append((fullpath, "file"))
         return all_files
     
-    def create_yml_inventory(self):
-        yml_inventory = []
+    def create_file_inventory(self):
+        file_inventory = []
         for project_name in self.scan_records["project_file_list"]:
             for file in self.scan_records["project_file_list"][project_name]["files"]:
                 task_scanned = file.get("task_scanned", False)
                 file["task_scanned"] = task_scanned
                 scanned_as = file.get("scanned_as", "")
                 file["scanned_as"] = scanned_as
-                yml_inventory.append(file)
+                loaded = file.get("loaded", False)
+                # we intentionally remove some files by is_skip_file_obj() in the current implementation
+                # so set loaded=False here in that case
+                if loaded:
+                    in_proj_path = file.get("path_from_root", "")
+                    if in_proj_path and in_proj_path in self.scan_records["ignored_files"]:
+                        loaded = False
+                file["loaded"] = loaded
+                file_inventory.append(file)
 
         for role_name in self.scan_records["role_file_list"]:
             for file in self.scan_records["role_file_list"][role_name]["files"]:
@@ -793,19 +825,50 @@ class SagePipeline(object):
                 file["task_scanned"] = task_scanned
                 scanned_as = file.get("scanned_as", "")
                 file["scanned_as"] = scanned_as
-                yml_inventory.append(file)
+                loaded = file.get("loaded", False)
+                # we intentionally remove some files by is_skip_file_obj() in the current implementation
+                # so set loaded=False here in that case
+                if loaded:
+                    in_proj_path = file.get("path_from_root", "")
+                    if in_proj_path and in_proj_path in self.scan_records["ignored_files"]:
+                        loaded = False
+                file["loaded"] = loaded
+                file_inventory.append(file)
 
         for file in self.scan_records["independent_file_list"]:
             task_scanned = file.get("task_scanned", False)
             file["task_scanned"] = task_scanned
             scanned_as = file.get("scanned_as", "")
             file["scanned_as"] = scanned_as
-            yml_inventory.append(file)
-        
-        return yml_inventory
+            loaded = file.get("loaded", False)
+            # we intentionally remove some files by is_skip_file_obj() in the current implementation
+            # so set loaded=False here in that case
+            if loaded:
+                in_proj_path = file.get("path_from_root", "")
+                if in_proj_path and in_proj_path in self.scan_records["ignored_files"]:
+                    loaded = False
+            file["loaded"] = loaded
+            file_inventory.append(file)
 
-    def save_yml_inventory(self, output_path):
-        lines = [json.dumps(file) + "\n" for file in self.yml_inventory]
+        for file in self.scan_records["non_yaml_file_list"]:
+            task_scanned = file.get("task_scanned", False)
+            file["task_scanned"] = task_scanned
+            scanned_as = file.get("scanned_as", "")
+            file["scanned_as"] = scanned_as
+            loaded = file.get("loaded", False)
+            # we intentionally remove some files by is_skip_file_obj() in the current implementation
+            # so set loaded=False here in that case
+            if loaded:
+                in_proj_path = file.get("path_from_root", "")
+                if in_proj_path and in_proj_path in self.scan_records["ignored_files"]:
+                    loaded = False
+            file["loaded"] = loaded
+            file_inventory.append(file)
+        
+        return file_inventory
+
+    def save_file_inventory(self, output_path):
+        lines = [json.dumps(file) + "\n" for file in self.file_inventory]
 
         out_dir = os.path.dirname(output_path)
         if not os.path.exists(out_dir):
@@ -838,7 +901,7 @@ class SagePipeline(object):
         if not self.scan_records:
             return
         source = self.scan_records.get("source", {})
-        yml_inventory = self.yml_inventory
+        file_inventory = self.file_inventory
         objects = self.scan_records.get("objects", [])
         metadata = self.scan_records.get("metadata", {})
         scan_time = self.scan_records.get("time", [])
@@ -847,7 +910,7 @@ class SagePipeline(object):
         dependencies = self.scan_records.get("dependencies", [])
         proj = SageProject.from_source_objects(
             source=source,
-            yml_inventory=yml_inventory,
+            file_inventory=file_inventory,
             objects=objects,
             metadata=metadata,
             scan_time=scan_time,
@@ -923,86 +986,131 @@ def get_yml_label(file_path, root_path):
 
 
 def get_yml_list(root_dir: str):
-    found_ymls = find_all_ymls(root_dir)
+    found_files = find_all_files(root_dir)
     all_files = []
-    for yml_path in found_ymls:
-        label, role_info, project_info, name_count, error = get_yml_label(yml_path, root_dir)
-        if not role_info:
-            role_info = {}
-        if not project_info:
-            project_info = {}
-        if role_info:
-            if role_info["path"] and not role_info["path"].startswith(root_dir):
-                role_info["path"] = os.path.join(root_dir, role_info["path"])
-            role_info["is_external_dependency"] = True if "." in role_info["name"] else False
-        in_role = True if role_info else False
-        in_project = True if project_info else False
-        all_files.append({
-            "filepath": yml_path,
-            "path_from_root": yml_path.replace(root_dir, "").lstrip("/"),
-            "label": label,
-            "role_info": role_info,
-            "project_info": project_info,
-            "in_role": in_role,
-            "in_project": in_project,
-            "name_count": name_count,
-            "error": error,
-        })
-    return all_files
-
-
-def create_scan_list(yml_inventory):
-    role_file_list = {}
-    project_file_list = {}
-    independent_file_list = []
-    for yml_data in yml_inventory:
-        filepath = yml_data["filepath"]
-        path_from_root = yml_data["path_from_root"]
-        label = yml_data["label"]
-        role_info = yml_data["role_info"]
-        in_role = yml_data["in_role"]
-        project_info = yml_data["project_info"]
-        in_project = yml_data["in_project"]
-        name_count = yml_data["name_count"]
-        error = yml_data["error"]
-        if project_info:
-            p_name = project_info.get("name", "")
-            p_path = project_info.get("path", "")
-            if p_name not in project_file_list:
-                project_file_list[p_name] = {"path": p_path, "files": []}
-            project_file_list[p_name]["files"].append({
-                "filepath": filepath,
-                "path_from_root": path_from_root,
+    for filepath in found_files:
+        ext = os.path.splitext(filepath)[1]
+        # YAML file
+        if ext and ext.lower() in [".yml", ".yaml"]:
+            yml_path = filepath
+            label, role_info, project_info, name_count, error = get_yml_label(yml_path, root_dir)
+            if not role_info:
+                role_info = {}
+            if not project_info:
+                project_info = {}
+            if role_info:
+                if role_info["path"] and not role_info["path"].startswith(root_dir):
+                    role_info["path"] = os.path.join(root_dir, role_info["path"])
+                role_info["is_external_dependency"] = True if "." in role_info["name"] else False
+            in_role = True if role_info else False
+            in_project = True if project_info else False
+            all_files.append({
+                "filepath": yml_path,
+                "path_from_root": yml_path.replace(root_dir, "").lstrip("/"),
                 "label": label,
-                "project_info": project_info,
+                "ext": ext,
+                "is_yml": True,
                 "role_info": role_info,
-                "in_project": in_project,
-                "in_role": in_role,
-                "name_count": name_count,
-                "error": error,
-            })
-        elif role_info:
-            r_name = role_info.get("name", "")
-            r_path = role_info.get("path", "")
-            if role_info.get("is_external_dependency", False):
-                continue
-            if r_name not in role_file_list:
-                role_file_list[r_name] = {"path": r_path, "files": []}
-            role_file_list[r_name]["files"].append({
-                "filepath": filepath,
-                "path_from_root": path_from_root,
-                "label": label,
                 "project_info": project_info,
-                "role_info": role_info,
-                "in_project": in_project,
                 "in_role": in_role,
+                "in_project": in_project,
                 "name_count": name_count,
                 "error": error,
             })
         else:
-            independent_file_list.append({
+            # non YAML file
+            all_files.append({
+                "filepath": filepath,
+                "path_from_root": filepath.replace(root_dir, "").lstrip("/"),
+                "label": "others",
+                "ext": ext,
+                "is_yml": False,
+                "role_info": None,
+                "project_info": None,
+                "in_role": False,
+                "in_project": False,
+                "name_count": -1,
+                "error": None,
+            })
+    return all_files
+
+
+def create_scan_list(file_inventory):
+    role_file_list = {}
+    project_file_list = {}
+    independent_file_list = []
+    non_yaml_file_list = []
+    for file_data in file_inventory:
+        filepath = file_data["filepath"]
+        path_from_root = file_data["path_from_root"]
+        ext = file_data["ext"]
+        is_yml = file_data["is_yml"]
+        label = file_data["label"]
+        role_info = file_data["role_info"]
+        in_role = file_data["in_role"]
+        project_info = file_data["project_info"]
+        in_project = file_data["in_project"]
+        name_count = file_data["name_count"]
+        error = file_data["error"]
+        if is_yml:
+            if project_info:
+                p_name = project_info.get("name", "")
+                p_path = project_info.get("path", "")
+                if p_name not in project_file_list:
+                    project_file_list[p_name] = {"path": p_path, "files": []}
+                project_file_list[p_name]["files"].append({
+                    "filepath": filepath,
+                    "path_from_root": path_from_root,
+                    "ext": ext,
+                    "is_yml": is_yml,
+                    "label": label,
+                    "project_info": project_info,
+                    "role_info": role_info,
+                    "in_project": in_project,
+                    "in_role": in_role,
+                    "name_count": name_count,
+                    "error": error,
+                })
+            elif role_info:
+                r_name = role_info.get("name", "")
+                r_path = role_info.get("path", "")
+                if role_info.get("is_external_dependency", False):
+                    continue
+                if r_name not in role_file_list:
+                    role_file_list[r_name] = {"path": r_path, "files": []}
+                role_file_list[r_name]["files"].append({
+                    "filepath": filepath,
+                    "path_from_root": path_from_root,
+                    "ext": ext,
+                    "is_yml": is_yml,
+                    "label": label,
+                    "project_info": project_info,
+                    "role_info": role_info,
+                    "in_project": in_project,
+                    "in_role": in_role,
+                    "name_count": name_count,
+                    "error": error,
+                })
+            else:
+                independent_file_list.append({
+                    "filepath": filepath,
+                    "path_from_root": path_from_root,
+                    "ext": ext,
+                    "is_yml": is_yml,
+                    "label": label,
+                    "project_info": project_info,
+                    "role_info": role_info,
+                    "in_project": in_project,
+                    "in_role": in_role,
+                    "name_count": name_count,
+                    "error": error,
+                })
+        else:
+            non_yaml_file_list.append({
                 "filepath": filepath,
                 "path_from_root": path_from_root,
+                "ext": ext,
+                "is_yml": is_yml,
                 "label": label,
                 "project_info": project_info,
                 "role_info": role_info,
@@ -1011,7 +1119,7 @@ def create_scan_list(yml_inventory):
                 "name_count": name_count,
                 "error": error,
             })
-    return project_file_list, role_file_list, independent_file_list
+    return project_file_list, role_file_list, independent_file_list, non_yaml_file_list
 
 
 def get_dir_size(path=""):

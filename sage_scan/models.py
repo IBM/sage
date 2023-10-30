@@ -413,7 +413,7 @@ class SageProject(object):
     source: dict = field(default_factory=dict)
     source_id: str = ""
 
-    yml_files: list = field(default_factory=list)
+    file_inventory: list = field(default_factory=list)
 
     collections: list = field(default_factory=list)
     modules: list = field(default_factory=list)
@@ -439,7 +439,7 @@ class SageProject(object):
     def from_source_objects(
         cls,
         source: dict,
-        yml_inventory: list,
+        file_inventory: list,
         objects: list,
         metadata: dict,
         scan_time: list,
@@ -452,7 +452,7 @@ class SageProject(object):
         if source:
             proj.source_id = json.dumps(source, separators=(',', ':'))
 
-        proj.yml_files = yml_inventory
+        proj.file_inventory = file_inventory
 
         for obj in objects:
             proj.add_object(obj)
@@ -612,7 +612,7 @@ class SageProject(object):
         new_proj = SageProject(
             source=self.source,
             source_id=self.source_id,
-            yml_files=self.yml_files,
+            file_inventory=self.file_inventory,
             path=self.path,
             scan_timestamp=self.scan_timestamp,
         )
@@ -626,7 +626,12 @@ class SageProject(object):
         objects = {}
         for attr in attr_list:
             objects_per_type = getattr(self, attr, [])
-            objects[attr] = len(objects_per_type)
+            if attr == "files":
+                objects["files"] = len(self.file_inventory)
+                objects["loaded_files"] = len(objects_per_type)
+                objects["ignored_files"] = objects["files"] - objects["loaded_files"]
+            else:
+                objects[attr] = len(objects_per_type)
         return {
             "source": self.source,
             "source_id": self.source_id,
@@ -636,7 +641,7 @@ class SageProject(object):
             "scan_time_detail": self.scan_time_detail,
             "dir_size": self.dir_size,
             "pipeline_version": self.pipeline_version,
-            "yml_files": self.yml_files,
+            "file_inventory": self.file_inventory,
             "ari_metadata": self.ari_metadata,
             "dependencies": self.dependencies,
         }

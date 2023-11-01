@@ -1,5 +1,7 @@
 import argparse
 from dataclasses import dataclass, field
+
+import jsonpickle
 from sage_scan.models import load_objects
 from sage_scan.process.utils import list_entrypoints, get_taskfiles_in_role
 from sage_scan.models import Playbook, TaskFile, Play, Task, Role, PlaybookData, TaskFileData
@@ -189,7 +191,12 @@ def get_vc_from_play(play: Play):
     vc = VarCont()
     vc.obj_key = play.key
     vc.filepath = play.filepath
-    vc.set_explicit_scoped_vars |= flatten_dict(play.variables)
+    vars = flatten_dict(play.variables)
+    for name, val in vars.items():
+        if isinstance(val, str) and "{{" in val:
+            vc.set_scoped_vars[name] = val
+        else:
+            vc.set_explicit_scoped_vars[name] = val
     # TODO: support vars_prompt
     return vc
 
@@ -320,7 +327,7 @@ def extract_when_option_var_name(option_parts, is_failed_when=False):
         if p.startswith('"') or p.startswith("'"):
             continue
         p = p.replace("\"", "")
-        if p.isdigit():
+        if is_num(p):
             continue
         if check_if_magic_vars(p):
             continue
@@ -378,6 +385,15 @@ def flatten_dict(d, parent_key='', sep='.'):
         else:
             items[new_key] = value
     return items
+
+
+def is_num(s):
+    try:
+        float(s)
+    except ValueError:
+        return False
+    else:
+        return True
 
 
 def filter_complex_name_vars(used_vars):

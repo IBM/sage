@@ -1,7 +1,6 @@
 import argparse
 from dataclasses import dataclass, field
 
-import jsonpickle
 from sage_scan.models import load_objects
 from sage_scan.process.utils import list_entrypoints, get_taskfiles_in_role
 from sage_scan.models import Playbook, TaskFile, Play, Task, Role, PlaybookData, TaskFileData

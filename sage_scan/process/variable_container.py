@@ -451,8 +451,6 @@ def find_all_undefined_vars(call_tree, vc_arr, target_filepath):
 
     accum_vc = VarCont()
     for vc in vc_arr.values():
-        if "molecule/users_and_roles/destroy.yml" in target_filepath:
-            print("[DEBUG] vc:", vc)
         if target_filepath and vc.filepath != target_filepath:
             continue
         accum_vc = compute_accum_vc(call_tree, vc_arr, vc.obj_key, vc.filepath)
@@ -531,8 +529,6 @@ def get_undefined_vars_in_obj_from_data(pd: PlaybookData|TaskFileData):
     call_seq = pd.call_seq
     vc_arr = make_vc_arr(call_seq)
     undefined_vars_in_obj, _ = find_all_undefined_vars(call_tree, vc_arr, pd.object.filepath)
-    if "molecule/users_and_roles/destroy.yml" in pd.object.filepath:
-        print("[DEBUG] undefined_vars_in_obj 1:", undefined_vars_in_obj)
     # TODO: this part will be removed when var name extraction becomes robust.
     undefined_vars_in_obj = filter_complex_name_vars(undefined_vars_in_obj)
     return undefined_vars_in_obj

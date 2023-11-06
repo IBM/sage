@@ -197,9 +197,10 @@ class SagePipeline(object):
         elif isinstance(kwargs, dict) and "raw_yaml" in kwargs:
             raw_yaml = kwargs["raw_yaml"]
             yaml_label = kwargs.get("yaml_label", "")
+            filepath = kwargs.get("filepath", "")
             self.scan_records["single_scan"] = True
             self.scan_records["source"] = kwargs.get("source", {})
-            return self._single_yaml_to_input(raw_yaml=raw_yaml, label=yaml_label)
+            return self._single_yaml_to_input(raw_yaml=raw_yaml, label=yaml_label, filepath=filepath)
         elif isinstance(kwargs, dict) and "ftdata_path" in kwargs:
             ftdata_path = kwargs["ftdata_path"]
             return self._ftdata_to_input(ftdata_path)
@@ -298,7 +299,7 @@ class SagePipeline(object):
 
         return input_list
 
-    def _single_yaml_to_input(self, raw_yaml, label=""):
+    def _single_yaml_to_input(self, raw_yaml, label="", filepath=""):
         if not label:
             label, _, error = label_yml_file(yml_body=raw_yaml)
             if error:
@@ -309,6 +310,7 @@ class SagePipeline(object):
             index=0,
             total_num=1,
             yaml=raw_yaml,
+            path=filepath,
             type=label,
         )
         input_list = [input_data]
@@ -737,25 +739,36 @@ class SagePipeline(object):
                     if annotations:
                         annotation_dict[spec_key] = annotations
 
-            ari_objects = findings.root_definitions.get("definitions", {})
-            tasks = ari_objects["tasks"]
+            ari_objects = {}
+            tasks = []
+            plays = []
+            if findings and findings.root_definitions:
+                ari_objects = findings.root_definitions.get("definitions", {})
+                tasks = ari_objects["tasks"]
+                plays = ari_objects["plays"]
+            
+            added_obj_keys = []
             for obj_type in ari_objects:
                 ari_objects_per_type = ari_objects[obj_type]
                 for ari_obj in ari_objects_per_type:
 
                     # filter files to avoid too many files in sage-objects
                     if obj_type == "files":
-                        if is_skip_file_obj(ari_obj, tasks):
+                        if is_skip_file_obj(ari_obj, tasks, plays):
                             self.scan_records["ignored_files"].append(ari_obj.defined_in)
                             continue
 
                     ari_spec_key = ari_obj.key
+                    if ari_spec_key in added_obj_keys:
+                        continue
+                    
                     sage_obj = convert_to_sage_obj(ari_obj, source)
                     if source:
                         sage_obj.set_source(source)
                     if ari_spec_key in annotation_dict:
                         sage_obj.annotations = annotation_dict[ari_spec_key]
                     self.scan_records["objects"].append(sage_obj)
+                    added_obj_keys.append(ari_spec_key)
 
             self.scan_records["time"].append({"target_type": _type, "target_name": name, "scan_seconds": elapsed})
 
@@ -1135,7 +1148,7 @@ def get_dir_size(path=""):
 
 # NOTE: currently we keep just files that are obviously for vars with a certain path
 #       and vars files that are explicitly used in some tasks; other types of files will be skipped
-def is_skip_file_obj(obj, tasks=[]):
+def is_skip_file_obj(obj, tasks=[], plays=[]):
     if not obj or getattr(obj, "type", "") != "file":
         return True
     
@@ -1161,11 +1174,37 @@ def is_skip_file_obj(obj, tasks=[]):
         if short_module != "include_vars":
             continue
         mo = getattr(t, "module_options")
-        if not isinstance(mo, str):
+        
+        vars_file_ref_list = []
+        loop_info = getattr(t, "loop")
+        if loop_info and isinstance(loop_info, dict):
+            for loop_var in loop_info:
+                loop_items = loop_info[loop_var]
+                if isinstance(loop_items, list):
+                    for v in loop_items:
+                        vars_file_ref_list.append(v)
+        else:
+            vars_file_ref = ""
+            if isinstance(mo, str):
+                vars_file_ref = mo
+            elif isinstance(mo, dict):
+                vars_file_ref = mo.get("file", "")
+            if vars_file_ref:
+                vars_file_ref_list.append(vars_file_ref)
+        if not vars_file_ref_list:
             continue
-        basename = mo.split("/")[-1]
-        if basename in fpath:
-            return False
+        
+        for vars_file_ref in vars_file_ref_list:
+            basename = vars_file_ref.split("/")[-1]
+            if basename in fpath:
+                return False
+        
+    for p in plays:
+        vars_files = getattr(p, "vars_files")
+        for vars_file in vars_files:
+            basename = vars_file.split("/")[-1]
+            if basename in fpath:
+                return False
         
     return  True
 

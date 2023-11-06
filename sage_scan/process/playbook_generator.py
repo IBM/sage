@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
 from sage_scan.models import Task
+from ansible_risk_insight.models import RoleInPlay
 import ansible_risk_insight.yaml as ariyaml
 from ruamel.yaml.scalarstring import DoubleQuotedScalarString
 
@@ -41,6 +42,18 @@ def task_obj_to_data(task: Task):
     return data
 
 
+def role_in_play_obj_to_data(rip: RoleInPlay):
+    data = {}
+    if rip.options and isinstance(rip.options, dict):
+        data["role"] = rip.name
+        for k, v in rip.options.items():
+            if k not in data:
+                data[k] = v
+    else:
+        data = rip.name
+    return data
+
+
 def _remove_top_level_offset(txt: str):
     lines = txt.splitlines()
     if len(lines) == 0:
@@ -67,7 +80,7 @@ class PlaybookGenerator(object):
     def yaml(self):
 
         playbook_data = []
-        for (play, tasks) in self.plays_and_tasks:
+        for (play, tasks, pre_tasks, post_tasks, handler_tasks) in self.plays_and_tasks:
 
             play_data = {}
             if play.name:
@@ -80,11 +93,29 @@ class PlaybookGenerator(object):
                 vars[k] = v
             if vars:
                 play_data["vars"] = vars
+            pre_tasks = [task_obj_to_data(t) for t in pre_tasks]
+            if pre_tasks:
+                play_data["pre_tasks"] = pre_tasks
             tasks = [task_obj_to_data(t) for t in tasks]
             if tasks:
                 play_data["tasks"] = tasks
+            post_tasks = [task_obj_to_data(t) for t in post_tasks]
+            if post_tasks:
+                play_data["post_tasks"] = post_tasks
+            handler_tasks = [task_obj_to_data(t) for t in handler_tasks]
+            if handler_tasks:
+                play_data["handlers"] = handler_tasks
 
-            playbook_data.append(play_data)
+            roles = [role_in_play_obj_to_data(rip) for rip in play.roles]
+            roles = [r for r in roles if r]
+            if roles:       
+                play_data["roles"] = roles
+
+            if play.import_playbook:
+                play_data["import_playbook"] = play.import_playbook
+
+            if play_data:
+                playbook_data.append(play_data)
         playbook_data = recursive_str_to_ruamel_quotated_str(playbook_data)
 
         # to pass ansible-lint indentation rule, we need offset config

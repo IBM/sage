@@ -1,9 +1,10 @@
 import argparse
+from typing import List
 from dataclasses import dataclass, field
 
 import jsonpickle
 from sage_scan.models import load_objects
-from sage_scan.models import Task, File
+from sage_scan.models import Play, Task, File
 import json
 import os
 
@@ -20,26 +21,48 @@ class FileCont:
 
 
 # retrieve file obj from used_file path
-def find_file_obj(fc: FileCont, objects):
-    for obj in objects:
-        if not isinstance(obj, File):
-            continue
-        current_dir = os.path.dirname(fc.current_filepath)
-        relative_path = os.path.relpath(obj.filepath, current_dir)
-        norm_used_file = os.path.normpath(fc.used_file)
-        if norm_used_file == relative_path:
-            return obj
-    return None
+def find_file_obj(fc_list: List[FileCont], objects):
+    if not fc_list:
+        return
+    
+    for i, fc in enumerate(fc_list):
+        found = False
+        for obj in objects:
+            if not isinstance(obj, File):
+                continue
+            current_dir = os.path.dirname(fc.current_filepath)
+            relative_path = os.path.relpath(obj.filepath, current_dir)
+            norm_used_file = os.path.normpath(fc.used_file)
+            if norm_used_file == relative_path:
+                fc_list[i].file_obj = obj
+                found = True
+            if found:
+                break
+    return
 
 
-# generate FileCont from sage obj
-def to_fc(obj):
-    fc = None
-    # TODO: support play vars file
-    # if isinstance(obj, Play):
-    if isinstance(obj, Task):
+# generate FileCont list from sage obj
+def to_fc_list(obj):
+    fc_list = []
+    if isinstance(obj, Play):
+        fc_list = get_fc_list_from_play(obj)
+    elif isinstance(obj, Task):
         fc = get_fc_from_task(obj)
-    return fc
+        fc_list = [fc]
+    return fc_list
+
+
+# return fc list from play obj
+def get_fc_list_from_play(obj: Play):
+    fc_list = []
+    if obj.vars_files:
+        for var_file in obj.vars_files:
+            fc = FileCont()
+            fc.obj_key = obj.key
+            fc.current_filepath = obj.filepath
+            fc.used_file = var_file
+            fc_list.append(fc)
+    return fc_list
 
 
 # return fc from task obj
@@ -61,12 +84,11 @@ def get_fc_from_task(obj: Task):
 
 # return fc with file obj
 def resolve_file(obj, file_objects):
-    fc = to_fc(obj)
-    if fc is None:
+    fc_list = to_fc_list(obj)
+    if not fc_list:
         return None
-    found_obj = find_file_obj(fc, file_objects)
-    fc.file_obj = found_obj
-    return fc
+    find_file_obj(fc_list, file_objects)
+    return fc_list
 
 
 def main():
@@ -85,9 +107,10 @@ def main():
         file_objs = project.files
         tasks = project.tasks
         for task in tasks:
-            fc = resolve_file(task, file_objs)
-            if fc:
-                results.append(jsonpickle.encode(fc,make_refs=False) + "\n")
+            fc_list = resolve_file(task, file_objs)
+            if fc_list:
+                for fc in fc_list:
+                    results.append(jsonpickle.encode(fc,make_refs=False) + "\n")
 
     with open(args.output, "w") as f:
         f.write("".join(results))

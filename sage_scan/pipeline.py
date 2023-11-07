@@ -772,7 +772,7 @@ class SagePipeline(object):
 
             self.scan_records["time"].append({"target_type": _type, "target_name": name, "scan_seconds": elapsed})
 
-            if _type == "project":
+            if findings and _type == "project":
                 metadata = findings.metadata.copy()
                 metadata.pop("time_records")
                 metadata["scan_timestamp"] = datetime.datetime.utcnow().isoformat(timespec="seconds")

@@ -93,8 +93,11 @@ def resolve_file(obj, file_objects):
 
 # return obj and fc list pairs in call_seq
 def resolve_files_for_object_data(pd: PlaybookData|TaskFileData):
-    call_seq = pd.call_seq
-    file_objects = pd.project.files
+    call_seq = []
+    file_objects = []
+    if pd:
+        call_seq = pd.call_seq
+        file_objects = pd.project.files
     obj_fc_list_pairs = []
     for obj in call_seq:
         if not obj:

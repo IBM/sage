@@ -277,38 +277,40 @@ def check_when_option(options):
         return used_vars
     when_value = options.get("when", "")
     failed_when_value = options.get("failed_when", "")
-    all_parts = []
+    all_values = []
     if type(when_value) == list:
         for v in when_value:
-            all_parts.extend(re.split('[ |]', v))
+            all_values.extend(v)
     elif type(when_value) == dict:
         for v in when_value.values():
-            all_parts.extend(re.split('[ |]', v))
+            all_values.append(v)
     else:
-        all_parts = re.split('[ |]', f"{when_value}")
+        all_values.append(when_value)
 
-    _used_vars = extract_when_option_var_name(all_parts)
+    _used_vars = extract_when_option_var_name(all_values)
     used_vars |= _used_vars
 
-    all_parts = []
+    all_values = []
     if type(failed_when_value) == list:
         for v in failed_when_value:
-            all_parts.extend(re.split('[ |]', v))
+            all_values.extend(v)
     elif type(failed_when_value) == dict:
         for v in failed_when_value.values():
-            all_parts.extend(re.split('[ |]', v))
+            all_values.append(v)
     else:
-        all_parts = re.split('[ |]', f"{failed_when_value}")
-    _used_vars = extract_when_option_var_name(all_parts, is_failed_when=True)
+        all_values.append(failed_when_value)
+        # all_values = re.split('[ |]', f"{failed_when_value}")
+    _used_vars = extract_when_option_var_name(all_values, is_failed_when=True)
     used_vars |= _used_vars
     return used_vars
 
 
 def extract_when_option_var_name(option_parts, is_failed_when=False):
+    option_parts = _split_values(option_parts)
     used_vars = {}
-    ignore_words = ["defined", "undefined", "is", "not", "and", "or", "|", "in", "none", "item"]
+    ignore_words = ["defined", "undefined", "is", "not", "and", "or", "|", "in", "none", "+", "vars"]
     boolean_vars = ["True", "true", "t", "yes", 'y', 'on', "False", "false", 'f', 'no', 'n', 'off']
-    data_type_words = ["bool", "float", "int", "length"]
+    data_type_words = ["bool", "float", "int", "length", "string"]
     for p in option_parts:
         if "match(" in p or "default(" in p:
             continue
@@ -325,6 +327,15 @@ def extract_when_option_var_name(option_parts, is_failed_when=False):
             continue
         if p.startswith('"') or p.startswith("'"):
             continue
+        if p.startswith("[") or p.startswith("]"):
+            continue
+        if p.startswith("item"):
+            continue
+        if "[" in p:
+            # extract var part from dict format like "hostvars[inventory_hostname]"
+            all_parts = re.split('[\[]', f"{p}")
+            if "[" not in all_parts[0]:
+                p = all_parts[0]
         p = p.replace("\"", "")
         if is_num(p):
             continue
@@ -336,6 +347,21 @@ def extract_when_option_var_name(option_parts, is_failed_when=False):
             used_vars[p] = {"original": p, "name": p}
     return used_vars
 
+def _split_values(all_values):
+    all_parts = []
+    for val in all_values:
+        # identify string enclosed in (") or (') to support the following case
+        # when: result.failed or 'Server API protected' not in result.content
+        double_quoted_strings = re.findall(r'"(.*?)"', f"{val}")
+        single_quoted_strings = re.findall(r"'(.*?)'", f"{val}")
+        for quoted_str in double_quoted_strings:
+            if quoted_str != "" and quoted_str != " ":
+                val = val.replace(quoted_str, " ")
+        for quoted_str in single_quoted_strings:
+            if quoted_str != '' and quoted_str != ' ':
+                val = val.replace(quoted_str, " ")
+        all_parts.extend(re.split('[ |]', f"{val}"))
+    return all_parts
 
 def flatten_dict_list(d, parent_key='', sep='.'):
     items = {}

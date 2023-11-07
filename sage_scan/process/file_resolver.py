@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 
 import jsonpickle
 from sage_scan.models import load_objects
-from sage_scan.models import Play, Task, File
+from sage_scan.models import Play, Task, File, PlaybookData, TaskFileData
 import json
 import os
 
@@ -82,13 +82,28 @@ def get_fc_from_task(obj: Task):
     return fc
 
 
-# return fc with file obj
+# return fc list with file obj
 def resolve_file(obj, file_objects):
     fc_list = to_fc_list(obj)
     if not fc_list:
         return None
     find_file_obj(fc_list, file_objects)
     return fc_list
+
+
+# return obj and fc list pairs in call_seq
+def resolve_files_for_object_data(pd: PlaybookData|TaskFileData):
+    call_seq = pd.call_seq
+    file_objects = pd.project.files
+    obj_fc_list_pairs = []
+    for obj in call_seq:
+        if not obj:
+            continue
+        fc_list = resolve_file(obj, file_objects)
+        if not fc_list:
+            continue
+        obj_fc_list_pairs.append((obj, fc_list))
+    return obj_fc_list_pairs
 
 
 def main():

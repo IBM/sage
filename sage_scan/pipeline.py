@@ -772,7 +772,7 @@ class SagePipeline(object):
 
             self.scan_records["time"].append({"target_type": _type, "target_name": name, "scan_seconds": elapsed})
 
-            if _type == "project":
+            if findings and _type == "project":
                 metadata = findings.metadata.copy()
                 metadata.pop("time_records")
                 metadata["scan_timestamp"] = datetime.datetime.utcnow().isoformat(timespec="seconds")
@@ -1182,7 +1182,12 @@ def is_skip_file_obj(obj, tasks=[], plays=[]):
                 loop_items = loop_info[loop_var]
                 if isinstance(loop_items, list):
                     for v in loop_items:
-                        vars_file_ref_list.append(v)
+                        if isinstance(v, str):
+                            vars_file_ref_list.append(v)
+                        elif isinstance(v, dict):
+                            # `with_first_found` case
+                            if "files" in v:
+                                vars_file_ref_list.extend(v["files"])
         else:
             vars_file_ref = ""
             if isinstance(mo, str):

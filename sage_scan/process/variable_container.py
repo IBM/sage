@@ -347,6 +347,7 @@ def extract_when_option_var_name(option_parts, is_failed_when=False):
             used_vars[p] = {"original": p, "name": p}
     return used_vars
 
+
 def _split_values(all_values):
     all_parts = []
     for val in all_values:
@@ -362,6 +363,7 @@ def _split_values(all_values):
                 val = val.replace(quoted_str, " ")
         all_parts.extend(re.split('[ |]', f"{val}"))
     return all_parts
+
 
 def flatten_dict_list(d, parent_key='', sep='.'):
     items = {}
@@ -409,6 +411,41 @@ def flatten_dict(d, parent_key='', sep='.'):
             items.update(flatten_dict(value, new_key, sep=sep))
         else:
             items[new_key] = value
+    return items
+
+
+# make dict from key parts
+def recursive_update(d, keys, value):
+    if not isinstance(d, dict):
+        d = {}
+    new_d = d.copy()
+
+    if not keys:
+        return {}
+    key = keys[0]
+    if len(keys) <= 1:
+        new_d[key] = value
+    else:
+        rest_keys = keys[1:]
+        if key not in new_d or not isinstance(new_d[key], dict):
+            new_d[key] = {}
+        new_d[key] = recursive_update(new_d[key], rest_keys, value)
+    return new_d
+
+
+# if single child element, flatten that part. if multiple child elements, keep nest structure.
+def flatten_single_child_in_dict(d, parent_key='', sep='.'):
+    items = {}
+    for k, v in d.items():
+        new_key = f"{parent_key}{sep}{k}" if parent_key else k
+        if isinstance(v, dict):
+            if len(v) == 1:
+                nested_key, nested_value = v.popitem()
+                items.update(flatten_dict({f"{new_key}{sep}{nested_key}": nested_value}))
+            else:
+                items[new_key] = flatten_dict(v)
+        else:
+            items[new_key] = v
     return items
 
 
@@ -582,6 +619,28 @@ def get_undefined_vars_value_from_data(pd: PlaybookData|TaskFileData, extra_set_
     return undefined_vars_value
 
 
+# return vars to be set in play
+def make_set_vars_for_undefined_vars(pd: PlaybookData|TaskFileData, included_vars: dict={}, extra_set_vars: dict={}): 
+    vars_to_set = {}
+    used_undefined_vars = get_undefined_vars_in_obj_from_data(pd=pd)
+    used_undefined_var_and_value = get_undefined_vars_value_from_data(pd=pd, extra_set_vars=extra_set_vars)
+    for var_name in used_undefined_vars:
+        if var_name in included_vars:
+            continue
+        value = ""
+        if var_name in used_undefined_var_and_value:
+            value = used_undefined_var_and_value[var_name].get("value", "")
+        else:
+            value = "{{ " + var_name.replace(".", "_") + " }}" 
+        if "." in var_name:
+            parts = var_name.split(".")
+            vars_to_set = recursive_update(vars_to_set, parts, value)
+        else:
+            vars_to_set[var_name] = value
+    vars_to_set = flatten_single_child_in_dict(vars_to_set)
+    return vars_to_set
+
+
 def resolve_variables(pd: PlaybookData|TaskFileData):
     call_tree = pd.call_tree
     call_seq = pd.call_seq
@@ -589,7 +648,8 @@ def resolve_variables(pd: PlaybookData|TaskFileData):
     set_vars, role_vars = find_all_set_vars(pd, call_tree, vc_arr)
     undefined_vars_in_obj, used_vars = find_all_undefined_vars(call_tree, vc_arr, pd.object.filepath)
     undefined_vars_value, _ = get_undefined_vars_value(set_vars, undefined_vars_in_obj)
-    return set_vars, role_vars, used_vars, undefined_vars_in_obj, undefined_vars_value
+    vars_to_set = make_set_vars_for_undefined_vars(pd)
+    return set_vars, role_vars, used_vars, undefined_vars_in_obj, undefined_vars_value, vars_to_set
 
 
 def main():
@@ -627,14 +687,15 @@ def main():
 
     results = []
     for pd in pbdata_arr:
-        set_vars, role_vars, used_vars, undefined_vars_in_obj, undefined_vars_value = resolve_variables(pd)
+        set_vars, role_vars, used_vars, undefined_vars_in_obj, undefined_vars_value, vars_to_set = resolve_variables(pd)
         result = {
             "entrypoint": pd.object.key,
             "set_vars": set_vars,
             "role_vars": role_vars,
             "used_vars": used_vars,
             "undefined_vars_in_pddata": undefined_vars_in_obj,
-            "undefined_vars_value": undefined_vars_value 
+            "undefined_vars_value": undefined_vars_value,
+            "vars_to_set": vars_to_set 
         }
         results.append(json.dumps(result))
 

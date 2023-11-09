@@ -279,8 +279,8 @@ def check_when_option(options):
     failed_when_value = options.get("failed_when", "")
     all_values = []
     if type(when_value) == list:
-        for v in when_value:
-            all_values.extend(v)
+        all_values.extend(when_value)
+            
     elif type(when_value) == dict:
         for v in when_value.values():
             all_values.append(v)
@@ -292,8 +292,7 @@ def check_when_option(options):
 
     all_values = []
     if type(failed_when_value) == list:
-        for v in failed_when_value:
-            all_values.extend(v)
+        all_values.extend(failed_when_value)
     elif type(failed_when_value) == dict:
         for v in failed_when_value.values():
             all_values.append(v)

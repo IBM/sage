@@ -1206,7 +1206,16 @@ def is_skip_file_obj(obj, tasks=[], plays=[]):
         
     for p in plays:
         vars_files = getattr(p, "vars_files")
+        # sometimes `vars_files` contains a loop variable with multiple items
+        # then make them flat list
+        flat_vars_files = []
         for vars_file in vars_files:
+            if isinstance(vars_file, list):
+                flat_vars_files.extend(vars_file)
+            else:
+                flat_vars_files.append(vars_file)
+
+        for vars_file in flat_vars_files:
             basename = vars_file.split("/")[-1]
             if basename in fpath:
                 return False

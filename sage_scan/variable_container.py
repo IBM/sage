@@ -61,7 +61,7 @@ def to_vc(obj):
 
 
 # set VarCont to the specified attribute in a sage obj
-def set_vc(obj, attr: str = "_variables"):
+def set_vc(obj, attr: str = "variables"):
     vc = to_vc(obj)
     setattr(obj, attr, vc)
     return obj

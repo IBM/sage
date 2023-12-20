@@ -27,6 +27,7 @@ from ansible_risk_insight.finder import (
 from ansible_risk_insight.utils import escape_local_path
 from sage_scan.utils import get_rule_id_list, get_git_version
 from sage_scan.models import convert_to_sage_obj, SageProject
+from sage_scan.variable_container import set_vc
 import os
 import time
 import traceback
@@ -765,6 +766,8 @@ class SagePipeline(object):
                     sage_obj = convert_to_sage_obj(ari_obj, source)
                     if source:
                         sage_obj.set_source(source)
+                    sage_obj = set_vc(sage_obj)
+                    print("[DEBUG] test")
                     if ari_spec_key in annotation_dict:
                         sage_obj.annotations = annotation_dict[ari_spec_key]
                     self.scan_records["objects"].append(sage_obj)

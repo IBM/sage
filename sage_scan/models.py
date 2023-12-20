@@ -49,6 +49,11 @@ class SageObject(object):
     test_object: bool = False
     annotations: Dict[str, any] = field(default_factory=dict)
 
+    # variable container
+    # TODO: replace the original `variables` attribute with this
+    # NOTE: `variables` is an attribute in ARI object, and some object types do not have it
+    _variables: any = None
+
     @classmethod
     def from_ari_obj(cls, ari_obj, source: dict={}):
         sage_obj = cls()

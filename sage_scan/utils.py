@@ -14,26 +14,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ansible_risk_insight.scanner import ARIScanner, config, Config
-from ansible_risk_insight.models import NodeResult, RuleResult
 from ansible_risk_insight.finder import (
     find_all_ymls,
     label_yml_file,
     get_role_info_from_path,
     get_project_info_for_file,
 )
-from ansible_risk_insight.utils import escape_local_path
 from ansible_risk_insight.risk_detector import load_rules
+import re
 import os
 import pathlib
 import pygit2
-import argparse
-import time
-import traceback
-import joblib
-import threading
 import jsonpickle
-import json
 
 
 def get_git_version():
@@ -189,3 +181,77 @@ def dump_new_findings_list(new_findings_list, fpath):
 
     with open(fpath, "w") as outfile:
         outfile.write("".join(lines))
+
+
+variable_block_re = re.compile(r"{{[^}]+}}")
+
+
+def extract_variable_names(txt):
+    if not variable_block_re.search(txt):
+        return []
+    found_var_blocks = variable_block_re.findall(txt)
+    blocks = []
+    for b in found_var_blocks:
+        if "lookup(" in b.replace(" ", ""):
+            continue
+        parts = b.split("|")
+        var_name = ""
+        default_var_name = ""
+        for i, p in enumerate(parts):
+            if i == 0:
+                var_name = p.replace("{{", "").replace("}}", "")
+                if " if " in var_name and " else " in var_name:
+                    # this block is not just a variable, but an expression
+                    # we need to split this with a space to get its elements
+                    skip_elements = ["if", "else", "+", "is", "defined"]
+                    sub_parts = var_name.split(" ")
+                    for sp in sub_parts:
+                        if not sp:
+                            continue
+                        if sp and sp in skip_elements:
+                            continue
+                        if sp and sp[0] in ['"', "'"]:
+                            continue
+                        var_name = sp
+                        break
+                var_name = var_name.replace(" ", "")
+                if "lookup(" in var_name and "first_found" in var_name:
+                    var_name = var_name.split(",")[-1].replace(")", "")
+                if var_name and var_name[0] == "(":
+                    var_name = var_name.split(")")[0].replace("(", "")
+                if "+" in var_name:
+                    sub_parts = var_name.split("+")
+                    for sp in sub_parts:
+                        if not sp:
+                            continue
+                        if sp and sp[0] in ['"', "'"]:
+                            continue
+                        var_name = sp
+                        break
+                if "[" in var_name and "." not in var_name:
+                    # extract dict/list name
+                    dict_pattern = r'(\w+)\[(\'|").*(\'|")\]'
+                    match = re.search(dict_pattern, var_name)
+                    if match:
+                        matched_str = match.group(1)
+                        var_name = matched_str.split("[")[0]
+                    list_pattern = r'(\w+)\[\-?\d+\]'
+                    match = re.search(list_pattern, var_name)
+                    if match:
+                        matched_str = match.group(1)
+                        var_name = matched_str.split("[")[0]
+            else:
+                if "default(" in p and ")" in p:
+                    default_var = p.replace("}}", "").replace("default(", "").replace(")", "").replace(" ", "")
+                    if not default_var.startswith('"') and not default_var.startswith("'") and not re.compile(r"[0-9].*").match(default_var):
+                        default_var_name = default_var
+        tmp_b = {
+            "original": b,
+        }
+        if var_name == "":
+            continue
+        tmp_b["name"] = var_name
+        if default_var_name != "":
+            tmp_b["default"] = default_var_name
+        blocks.append(tmp_b)
+    return blocks

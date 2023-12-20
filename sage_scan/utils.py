@@ -254,7 +254,6 @@ def extract_variable_names(txt):
         if default_var_name != "":
             tmp_b["default"] = default_var_name
         blocks.append(tmp_b)
-<<<<<<< HEAD
     return blocks
 
 
@@ -272,6 +271,3 @@ def strtobool(val):
         return 0
     else:
         raise ValueError("invalid truth value %r" % (val,))
-=======
-    return blocks
->>>>>>> 44284be (move variable_container from process to sage_scan)

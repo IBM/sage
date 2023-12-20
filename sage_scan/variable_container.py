@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 from sage_scan.models import load_objects
 from sage_scan.models import Playbook, TaskFile, Play, Task, Role, PlaybookData, TaskFileData
 from sage_scan.utils import extract_variable_names
-from sage_scan.process.utils import list_entrypoints, get_taskfiles_in_role, extract_variable_names
+from sage_scan.process.utils import list_entrypoints, get_taskfiles_in_role
 
 
 magic_vars = []
@@ -708,6 +708,7 @@ def main():
 
     with open(args.output, "w") as f:
         f.write("\n".join(results))
+
 
 if __name__ == "__main__":
     main()

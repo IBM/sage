@@ -46,9 +46,8 @@ from ansible_risk_insight.models import (
 
 
 variable_block_re = re.compile(r"{{[^}]+}}")
-p = Path(__file__).resolve().parent
+p = Path(__file__).resolve().parent.parent
 ansible_special_variables = [line.replace("\n", "") for line in open(p / "ansible_variables.txt", "r").read().splitlines()]
-variable_block_re = re.compile(r"{{[^}]+}}")
 
 
 @dataclass

@@ -767,7 +767,6 @@ class SagePipeline(object):
                     if source:
                         sage_obj.set_source(source)
                     sage_obj = set_vc(sage_obj)
-                    print("[DEBUG] test")
                     if ari_spec_key in annotation_dict:
                         sage_obj.annotations = annotation_dict[ari_spec_key]
                     self.scan_records["objects"].append(sage_obj)

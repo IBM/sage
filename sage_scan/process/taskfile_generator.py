@@ -7,13 +7,13 @@ def task_obj_to_data(task: Task):
     data = {}
     if task.name:
         data["name"] = task.name
-    
+
     module_name = task.module
     if task.annotations and isinstance(task.annotations, dict):
         module_name = task.annotations.get("module_fqcn", module_name)
-    
+
     if module_name:
-        data[module_name] = task.module_options    
+        data[module_name] = task.module_options
 
     if task.options and isinstance(task.options, dict):
         for k, v in task.options.items():
@@ -41,7 +41,7 @@ def _remove_top_level_offset(txt: str):
 @dataclass
 class TaskfileGenerator(object):
     tasks: list = field(default_factory=list)
-    
+
     _yaml: str = ""
 
     def yaml(self):

@@ -29,7 +29,7 @@ from ansible_risk_insight.models import Annotation
 
 
 # find all tasks defined in the specified playbook from SageProject
-def get_tasks_in_playbook(playbook: Playbook, project: SageProject=None):
+def get_tasks_in_playbook(playbook: Playbook, project: SageProject = None):
     play_keys = playbook.plays
     tasks = []
     for p_key in play_keys:
@@ -42,7 +42,7 @@ def get_tasks_in_playbook(playbook: Playbook, project: SageProject=None):
 
 
 # find all tasks defined in the specified play from SageProject
-def get_tasks_in_play(play: Play, project: SageProject=None):
+def get_tasks_in_play(play: Play, project: SageProject = None):
     task_keys = play.pre_tasks + play.tasks + play.post_tasks
     tasks = []
     for t_key in task_keys:
@@ -54,7 +54,7 @@ def get_tasks_in_play(play: Play, project: SageProject=None):
 
 
 # find all tasks defined in the specified taskfile from SageProject
-def get_tasks_in_taskfile(taskfile: TaskFile, project: SageProject=None):
+def get_tasks_in_taskfile(taskfile: TaskFile, project: SageProject = None):
     task_keys = taskfile.tasks
     tasks = []
     for t_key in task_keys:
@@ -66,7 +66,7 @@ def get_tasks_in_taskfile(taskfile: TaskFile, project: SageProject=None):
 
 
 # find all tasks defined in the specified playbook or taskfile from SageProject
-def get_tasks_in_file(target: Playbook|TaskFile=None, project: SageProject=None):
+def get_tasks_in_file(target: Playbook | TaskFile = None, project: SageProject = None):
     tasks = []
     if isinstance(target, Playbook):
         tasks = get_tasks_in_playbook(target, project)
@@ -77,7 +77,7 @@ def get_tasks_in_file(target: Playbook|TaskFile=None, project: SageProject=None)
 
 # find all tasks defined in the specified playbook or taskfile from SageProject
 # if `root` is an object key, get the object from SageProject first
-def get_tasks(root: str | SageObject, project: SageProject=None):
+def get_tasks(root: str | SageObject, project: SageProject = None):
     root_obj = root
     if isinstance(root, str):
         root_obj = project.get_object(key=root)
@@ -133,29 +133,29 @@ def find_parent_role(taskfile: TaskFile, project: SageProject):
 
 # get call tree which starts from the specified entrypoint
 # call tree is a list of (obj, child_obj)
-def get_call_tree_by_entrypoint(entrypoint: Playbook|Role|TaskFile, project: SageProject, follow_include: bool=True):
+def get_call_tree_by_entrypoint(entrypoint: Playbook | Role | TaskFile, project: SageProject, follow_include: bool = True):
     return project.get_call_tree_by_entrypoint(entrypoint, follow_include)
 
 
 # get all call sequences found in the SageProject
 # call sequence is a sequence of objects executed by an entrypoint
-# e.g.) Playbook --> Play 1 -> Task 1a -> Task 1b -> Play 2 -> Task 2a 
-def get_all_call_sequences(project: SageProject, follow_include: bool=True):
+# e.g.) Playbook --> Play 1 -> Task 1a -> Task 1b -> Play 2 -> Task 2a
+def get_all_call_sequences(project: SageProject, follow_include: bool = True):
     return project.get_all_call_sequences(follow_include)
 
 
 # get a call sequence which contains the specified task
-def get_call_sequence_for_task(task: Task, project: SageProject, follow_include: bool=True):
+def get_call_sequence_for_task(task: Task, project: SageProject, follow_include: bool = True):
     return project.get_call_sequence_for_task(task, follow_include)
 
 
 # get call sequence which starts from the specified entrypoint
-def get_call_sequence_by_entrypoint(entrypoint: Playbook|Role|TaskFile, project: SageProject, follow_include: bool=True):
+def get_call_sequence_by_entrypoint(entrypoint: Playbook | Role | TaskFile, project: SageProject, follow_include: bool = True):
     return project.get_call_sequence_by_entrypoint(entrypoint, follow_include)
 
 
 # get task sequence which starts from the specified entrypoint
-def get_task_sequence_by_entrypoint(entrypoint: Playbook|Role|TaskFile, project: SageProject, follow_include: bool=True):
+def get_task_sequence_by_entrypoint(entrypoint: Playbook | Role | TaskFile, project: SageProject, follow_include: bool = True):
     call_seq = get_call_sequence_by_entrypoint(entrypoint, project, follow_include)
     if not call_seq:
         return None
@@ -163,13 +163,13 @@ def get_task_sequence_by_entrypoint(entrypoint: Playbook|Role|TaskFile, project:
 
 
 # get a task sequence which starts from the specified playbook
-def get_task_sequence_for_playbook(playbook: Playbook, project: SageProject, follow_include: bool=True):
+def get_task_sequence_for_playbook(playbook: Playbook, project: SageProject, follow_include: bool = True):
     return get_task_sequence_by_entrypoint(playbook, project, follow_include)
 
 
 # get a task sequences which starts from the specified role
 # this returns a list of task sequences; each sequence starts from a single taskfile in the role
-def get_task_sequences_for_role(role: Role, project: SageProject, follow_include: bool=True):
+def get_task_sequences_for_role(role: Role, project: SageProject, follow_include: bool = True):
     taskfiles = get_taskfiles_in_role(role, project)
     task_seq_list = []
     for taskfile in taskfiles:
@@ -181,7 +181,7 @@ def get_task_sequences_for_role(role: Role, project: SageProject, follow_include
 
 
 # get a task sequences which starts from the specified taskfile
-def get_task_sequence_for_taskfile(taskfile: TaskFile, project: SageProject, follow_include: bool=True):
+def get_task_sequence_for_taskfile(taskfile: TaskFile, project: SageProject, follow_include: bool = True):
     return get_task_sequence_by_entrypoint(taskfile, project, follow_include)
 
 
@@ -207,10 +207,11 @@ def get_defined_vars(object: SageObject, project: SageProject):
     resolver = VariableResolver()
     return resolver.get_defined_vars(object=target, call_seq=obj_list)
 
+
 # get used vars for the specified object
 # this returns a dict of var_name and var_value pairs, where values are resolved as much as possible
 # if variable resolution fails, the value will be a placeholder string like `{{ var_name }}`
-def get_used_vars(object: SageObject, project: SageProject, follow_include: bool=True):
+def get_used_vars(object: SageObject, project: SageProject, follow_include: bool = True):
     obj_list = []
     if isinstance(object, TaskFile):
         role = find_parent_role(object, project)
@@ -224,7 +225,7 @@ def get_used_vars(object: SageObject, project: SageProject, follow_include: bool
     obj_list.extend(call_seq)
     if not obj_list:
         return {}
-    
+
     target = obj_list[-1]
     resolver = VariableResolver()
     return resolver.get_used_vars(object=target, call_seq=obj_list)
@@ -240,7 +241,7 @@ def set_vars_annotation(object: SageObject, project: SageProject):
     obj_list.extend(call_seq)
     if not obj_list:
         return []
-    
+
     resolver = VariableResolver()
     obj_vars_list = resolver.set_used_vars(call_seq=obj_list)
     obj_list = [obj for (obj, _, _) in obj_vars_list]

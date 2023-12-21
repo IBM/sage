@@ -26,13 +26,13 @@ def task_obj_to_data(task: Task):
     data = {}
     if task.name:
         data["name"] = task.name
-    
+
     module_name = task.module
     if task.annotations and isinstance(task.annotations, dict):
         module_name = task.annotations.get("module_fqcn", module_name)
-    
+
     if module_name:
-        data[module_name] = task.module_options    
+        data[module_name] = task.module_options
 
     if task.options and isinstance(task.options, dict):
         for k, v in task.options.items():
@@ -71,17 +71,14 @@ def _remove_top_level_offset(txt: str):
 
 @dataclass
 class PlaybookGenerator(object):
-    
     plays_and_tasks: list = field(default_factory=list)
     vars: dict = field(default_factory=dict)
-    
+
     _yaml: str = ""
 
     def yaml(self):
-
         playbook_data = []
-        for (play, tasks, pre_tasks, post_tasks, handler_tasks) in self.plays_and_tasks:
-
+        for play, tasks, pre_tasks, post_tasks, handler_tasks in self.plays_and_tasks:
             play_data = {}
             if play.name:
                 play_data["name"] = play.name
@@ -108,7 +105,7 @@ class PlaybookGenerator(object):
 
             roles = [role_in_play_obj_to_data(rip) for rip in play.roles]
             roles = [r for r in roles if r]
-            if roles:       
+            if roles:
                 play_data["roles"] = roles
 
             if play.import_playbook:

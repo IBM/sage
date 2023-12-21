@@ -28,6 +28,7 @@ from sage_scan.models import (
     SageObject,
     SageProject,
 )
+from sage_scan.utils import extract_variable_names
 from sage_scan.process.annotations import (
     ARGUMENTS_ANNOTATION_KEY,
     VARIABLES_SET_ANNOTATION_KEY,
@@ -52,7 +53,6 @@ ansible_special_variables = [line.replace("\n", "") for line in open(p / "ansibl
 
 @dataclass
 class VariableResolver(object):
-
     def resolve_all_vars_in_project(self, project: SageProject):
         all_call_sequences = project.get_all_call_sequences()
         for call_seq in all_call_sequences:
@@ -65,7 +65,7 @@ class VariableResolver(object):
             if obj.key == object.key:
                 return defnied_vars
         return {}
-    
+
     def get_used_vars(self, object: SageObject, call_seq: list):
         obj_and_vars_list = self.set_used_vars(call_seq=call_seq)
         for obj, _, used_vars in obj_and_vars_list:
@@ -76,7 +76,7 @@ class VariableResolver(object):
     def set_defined_vars(self, call_seq: list):
         obj_and_vars_list = self.traverse(call_seq=call_seq)
         return obj_and_vars_list
-    
+
     def set_used_vars(self, call_seq: list):
         obj_and_vars_list = self.traverse(call_seq=call_seq)
         return obj_and_vars_list
@@ -188,12 +188,12 @@ class VariableResolver(object):
                     var_block = "{{ " + k + " }}"
                     if is_loop_var(var_block, task):
                         continue
-                    
+
                     value = _var.value
                     if _var.type == VariableType.Unknown:
                         value = make_value_placeholder(k)
                     used_vars_key_value[k] = value
-                    
+
                 obj_and_vars_list.append((obj, defined_vars_key_value, used_vars_key_value))
             else:
                 last_defined = {}
@@ -202,7 +202,7 @@ class VariableResolver(object):
                     _, last_defined, last_used = obj_and_vars_list[-1]
                 obj_and_vars_list.append((obj, last_defined, last_used))
         return obj_and_vars_list
-    
+
     def update_resolved_vars_dict(self, vars_dict, var_name, var_value):
         def _recursive_update(d, keys, value):
             if not isinstance(d, dict):
@@ -234,7 +234,7 @@ def make_value_placeholder(var_name: str):
     if "." in var_name:
         var_name = var_name.replace(".", "_")
     return "{{ " + var_name + " }}"
-    
+
 
 def flatten_vars_dict(vars_dict: dict, _prefix: str = ""):
     flat_vars_dict = {}
@@ -497,7 +497,6 @@ class VariableContext:
             registered_vars=copy.copy(self.registered_vars),
         )
         # return copy.deepcopy(self)
-
 
 
 def resolve_module_options(context: VariableContext, task: Task):

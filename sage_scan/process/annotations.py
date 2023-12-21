@@ -67,7 +67,6 @@ def set_module_spec_annotations(task: Task):
 def set_module_arg_key_annotations(task: Task, knowledge_base=None):
     module = task.get_annotation(MODULE_OBJECT_ANNOTATION_KEY)
     if task.executable_type == ExecutableType.MODULE_TYPE and module and module.arguments:
-
         mo = task.module_options
         module_fqcn = module.fqcn
         module_short = ""
@@ -181,7 +180,6 @@ def set_module_arg_key_annotations(task: Task, knowledge_base=None):
 def set_module_arg_value_annotations(task: Task):
     module = task.get_annotation(MODULE_OBJECT_ANNOTATION_KEY)
     if task.executable_type == ExecutableType.MODULE_TYPE and module and module.arguments:
-
         wrong_values = []
         undefined_values = []
         unknown_type_values = []

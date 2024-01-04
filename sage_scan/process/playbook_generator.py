@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 from sage_scan.models import Task
-from ansible_risk_insight.models import RoleInPlay
-import ansible_risk_insight.yaml as ariyaml
+from ari_core.models import RoleInPlay
+import ari_core.yaml as ariyaml
 from ruamel.yaml.scalarstring import DoubleQuotedScalarString
 
 

@@ -19,9 +19,9 @@ import os
 import json
 import argparse
 from treelib import Node, Tree
-from ansible_risk_insight.findings import Findings
-from ansible_risk_insight.models import Collection, Module, Playbook, Play, RoleInPlay, Repository, Role, TaskFile, Task
-from ansible_risk_insight.keyutil import get_obj_type
+from ari_core.findings import Findings
+from ari_core.models import Collection, Module, Playbook, Play, RoleInPlay, Repository, Role, TaskFile, Task
+from ari_core.keyutil import get_obj_type
 
 
 

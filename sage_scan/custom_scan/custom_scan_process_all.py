@@ -22,8 +22,8 @@ import time
 import argparse
 from sage_scan.models import Task, Playbook, TaskFile, Project
 from sage_scan.tools.src_rebuilder import write_result, prepare_source_dir
-from ansible_risk_insight.risk_assessment_model import RAMClient
-from ansible_risk_insight.models import (
+from ari_core.risk_assessment_model import RAMClient
+from ari_core.models import (
     Module as ARIModule,
 )
 

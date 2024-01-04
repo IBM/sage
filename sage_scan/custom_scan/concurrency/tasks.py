@@ -25,8 +25,8 @@ import os
 import time
 import traceback
 from celery import Celery
-from ansible_risk_insight.models import Module as ARIModule
-from ansible_risk_insight.risk_assessment_model import RAMClient
+from ari_core.models import Module as ARIModule
+from ari_core.risk_assessment_model import RAMClient
 
 
 dp = SagePipeline(silent=True)

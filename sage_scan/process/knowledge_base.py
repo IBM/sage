@@ -22,13 +22,13 @@ from sage_scan.models import (
     SageProject,
 )
 from sage_scan.process.annotations import MODULE_OBJECT_ANNOTATION_KEY
-from ansible_risk_insight.models import (
+from ari_core.models import (
     ExecutableType,
     Module as ARIModule,
     ActionGroupMetadata,
     VariableType,
 )
-from ansible_risk_insight.risk_assessment_model import RAMClient
+from ari_core.risk_assessment_model import RAMClient
 
 
 SAGE_KB_DATA_DIR = os.getenv("SAGE_KB_DATA_DIR", None)

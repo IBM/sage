@@ -19,13 +19,13 @@ import sys
 import jsonpickle
 import argparse
 from sage_scan.pipeline import SerializableRunContext
-from ansible_risk_insight.models import (
+from ari_core.models import (
     Module,
     Task,
     TaskCall,
     AnsibleRunContext,
 )
-from ansible_risk_insight.risk_assessment_model import RAMClient
+from ari_core.risk_assessment_model import RAMClient
 import tabulate
 
 

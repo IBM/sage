@@ -35,7 +35,7 @@ from sage_scan.process.annotations import (
     VARIABLES_USED_ANNOTATION_KEY,
     is_loop_var,
 )
-from ansible_risk_insight.models import (
+from ari_core.models import (
     Variable,
     VariableType,
     BecomeInfo,

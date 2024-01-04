@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 from sage_scan.models import Playbook, Task
-import ansible_risk_insight.yaml as ariyaml
+import ari_core.yaml as ariyaml
 
 
 def task_obj_to_data(task: Task):

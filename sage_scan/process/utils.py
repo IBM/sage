@@ -25,7 +25,7 @@ from sage_scan.process.annotations import (
     set_variable_annotations,
     omit_object_annotations,
 )
-from ansible_risk_insight.models import Annotation
+from ari_core.models import Annotation
 
 
 # find all tasks defined in the specified playbook from SageProject

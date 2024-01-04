@@ -21,7 +21,7 @@ from datetime import date, time
 from dataclasses import dataclass, field
 import ruamel.yaml
 
-from ansible_risk_insight.models import (
+from ari_core.models import (
     AnsibleRunContext,
     RunTargetType,
     Rule,
@@ -37,7 +37,7 @@ from ansible_risk_insight.models import (
     Variable,
     VariableType,
 )
-import ansible_risk_insight.yaml as ariyaml
+import ari_core.yaml as ariyaml
 import os
 import re
 

@@ -61,14 +61,14 @@ class KnowledgeBase(object):
             self.kb_client = ram_client
         return
 
-    def resolve_task(self, task: Task, set_module_object_annotation: bool=False):
+    def resolve_task(self, task: Task, set_module_object_annotation: bool = False):
         exec_type = task.executable_type
         include_types = [ExecutableType.ROLE_TYPE, ExecutableType.TASKFILE_TYPE]
 
         task = self.set_module_info(task, set_module_object_annotation)
         if exec_type in include_types:
             task = self.set_include_info(task)
-        
+
         if exec_type == ExecutableType.MODULE_TYPE:
             if task.module_info and isinstance(task.module_info, dict):
                 task.resolved_name = task.module_info.get("fqcn", "")
@@ -80,8 +80,8 @@ class KnowledgeBase(object):
                 task.resolved_name = task.include_info.get("key", "")
 
         return task
-    
-    def set_module_info(self, task: Task, set_module_object_annotation: bool=False):
+
+    def set_module_info(self, task: Task, set_module_object_annotation: bool = False):
         if not isinstance(task, Task):
             raise ValueError(f"expect a task object, but {type(task)}")
 
@@ -105,7 +105,7 @@ class KnowledgeBase(object):
                 task.set_annotation(MODULE_OBJECT_ANNOTATION_KEY, module)
 
         return task
-    
+
     def set_include_info(self, task: Task):
         if not isinstance(task, Task):
             raise ValueError(f"expect a task object, but {type(task)}")
@@ -117,17 +117,17 @@ class KnowledgeBase(object):
             result = self.kb_client.search_role(name=exec_target)
             if not result:
                 return task
-            
+
             if not isinstance(result, list):
                 return task
-            
+
             if not isinstance(result[0], dict):
                 return task
-        
+
             role = result[0].get("object", None)
             if not role:
                 return task
-            
+
             include_info = {
                 "type": "role",
                 "fqcn": role.fqcn,
@@ -139,24 +139,22 @@ class KnowledgeBase(object):
             result = self.kb_client.search_taskfile(name=exec_target, is_key=True)
             if not result:
                 return task
-            
+
             if not isinstance(result, list):
                 return task
-            
+
             if not isinstance(result[0], dict):
                 return task
-        
+
             taskfile = result[0].get("object", None)
             if not taskfile:
                 return task
-            
+
             include_info = {
                 "type": "taskfile",
                 "path": taskfile.defined_in,
                 "key": taskfile.key,
             }
-        
+
         task.include_info = include_info
         return task
-
-

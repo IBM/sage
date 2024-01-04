@@ -25,8 +25,9 @@ from ansible_risk_insight.finder import (
     get_project_info_for_file,
 )
 from ansible_risk_insight.utils import escape_local_path
-from sage_scan.utils import get_rule_id_list, get_git_version
+from sage_scan.utils import get_rule_id_list, get_git_version, strtobool
 from sage_scan.models import convert_to_sage_obj, SageProject
+from sage_scan.variable_container import set_vc
 import os
 import time
 import traceback
@@ -52,6 +53,10 @@ if log_level is None:
 logger.setLevel(log_level)
 
 ftdata_rule_dir = os.path.join(os.path.dirname(__file__), "custom_scan/rules")
+
+
+_new_variables_feature_env_key = "SAGE_USE_NEW_VARIABLES"
+FEATURE_USE_NEW_VARIABLES = strtobool(os.getenv(_new_variables_feature_env_key, "False"))
 
 
 @dataclass
@@ -765,6 +770,10 @@ class SagePipeline(object):
                     sage_obj = convert_to_sage_obj(ari_obj, source)
                     if source:
                         sage_obj.set_source(source)
+                    
+                    if FEATURE_USE_NEW_VARIABLES:
+                        sage_obj = set_vc(sage_obj)
+                    
                     if ari_spec_key in annotation_dict:
                         sage_obj.annotations = annotation_dict[ari_spec_key]
                     self.scan_records["objects"].append(sage_obj)

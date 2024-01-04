@@ -49,6 +49,10 @@ class SageObject(object):
     test_object: bool = False
     annotations: Dict[str, any] = field(default_factory=dict)
 
+    # variable container
+    # currently this attribute is set only when the `USE_NEW_VARIABLES` feature flag is on
+    variables: any = None
+
     @classmethod
     def from_ari_obj(cls, ari_obj, source: dict={}):
         sage_obj = cls()

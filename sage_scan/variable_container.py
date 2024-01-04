@@ -1,14 +1,15 @@
-import argparse
-from dataclasses import dataclass, field
-
-from sage_scan.models import load_objects
-from sage_scan.process.utils import list_entrypoints, get_taskfiles_in_role
-from sage_scan.models import Playbook, TaskFile, Play, Task, Role, PlaybookData, TaskFileData
-from sage_scan.process.variable_resolver import extract_variable_names
 import json
 import os
 import copy
 import re
+import argparse
+from dataclasses import dataclass, field
+
+from sage_scan.models import load_objects
+from sage_scan.models import Playbook, TaskFile, Play, Task, Role, PlaybookData, TaskFileData
+from sage_scan.utils import extract_variable_names
+from sage_scan.process.utils import list_entrypoints, get_taskfiles_in_role
+
 
 magic_vars = []
 vars_file = os.getenv("VARS_FILE", os.path.join(os.path.dirname(__file__),"ansible_variables.txt"))
@@ -57,6 +58,13 @@ def to_vc(obj):
     elif isinstance(obj, Task):
         vc = get_vc_from_task(obj)
     return vc
+
+
+# set VarCont to the specified attribute in a sage obj
+def set_vc(obj, attr: str = "variables"):
+    vc = to_vc(obj)
+    setattr(obj, attr, vc)
+    return obj
 
 
 # return VarCont list
@@ -700,6 +708,7 @@ def main():
 
     with open(args.output, "w") as f:
         f.write("\n".join(results))
+
 
 if __name__ == "__main__":
     main()

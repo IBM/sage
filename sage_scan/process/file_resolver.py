@@ -24,7 +24,7 @@ class FileCont:
 def find_file_obj(fc_list: List[FileCont], objects):
     if not fc_list:
         return
-    
+
     for i, fc in enumerate(fc_list):
         found = False
         for obj in objects:
@@ -92,7 +92,7 @@ def resolve_file(obj, file_objects):
 
 
 # return obj and fc list pairs in call_seq
-def resolve_files_for_object_data(pd: PlaybookData|TaskFileData):
+def resolve_files_for_object_data(pd: PlaybookData | TaskFileData):
     call_seq = []
     file_objects = []
     if pd:
@@ -118,7 +118,7 @@ def main():
     fpath = args.file
 
     sage_objects = load_objects(fpath)
-    projects = sage_objects.projects()   
+    projects = sage_objects.projects()
 
     results = []
     for project in projects:
@@ -128,10 +128,11 @@ def main():
             fc_list = resolve_file(task, file_objs)
             if fc_list:
                 for fc in fc_list:
-                    results.append(jsonpickle.encode(fc,make_refs=False) + "\n")
+                    results.append(jsonpickle.encode(fc, make_refs=False) + "\n")
 
     with open(args.output, "w") as f:
         f.write("".join(results))
+
 
 if __name__ == "__main__":
     main()

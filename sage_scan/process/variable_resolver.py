@@ -28,6 +28,7 @@ from sage_scan.models import (
     SageObject,
     SageProject,
 )
+from sage_scan.utils import extract_variable_names
 from sage_scan.process.annotations import (
     ARGUMENTS_ANNOTATION_KEY,
     VARIABLES_SET_ANNOTATION_KEY,
@@ -46,14 +47,12 @@ from ansible_risk_insight.models import (
 
 
 variable_block_re = re.compile(r"{{[^}]+}}")
-p = Path(__file__).resolve().parent
+p = Path(__file__).resolve().parent.parent
 ansible_special_variables = [line.replace("\n", "") for line in open(p / "ansible_variables.txt", "r").read().splitlines()]
-variable_block_re = re.compile(r"{{[^}]+}}")
 
 
 @dataclass
 class VariableResolver(object):
-
     def resolve_all_vars_in_project(self, project: SageProject):
         all_call_sequences = project.get_all_call_sequences()
         for call_seq in all_call_sequences:
@@ -66,7 +65,7 @@ class VariableResolver(object):
             if obj.key == object.key:
                 return defnied_vars
         return {}
-    
+
     def get_used_vars(self, object: SageObject, call_seq: list):
         obj_and_vars_list = self.set_used_vars(call_seq=call_seq)
         for obj, _, used_vars in obj_and_vars_list:
@@ -77,7 +76,7 @@ class VariableResolver(object):
     def set_defined_vars(self, call_seq: list):
         obj_and_vars_list = self.traverse(call_seq=call_seq)
         return obj_and_vars_list
-    
+
     def set_used_vars(self, call_seq: list):
         obj_and_vars_list = self.traverse(call_seq=call_seq)
         return obj_and_vars_list
@@ -189,12 +188,12 @@ class VariableResolver(object):
                     var_block = "{{ " + k + " }}"
                     if is_loop_var(var_block, task):
                         continue
-                    
+
                     value = _var.value
                     if _var.type == VariableType.Unknown:
                         value = make_value_placeholder(k)
                     used_vars_key_value[k] = value
-                    
+
                 obj_and_vars_list.append((obj, defined_vars_key_value, used_vars_key_value))
             else:
                 last_defined = {}
@@ -203,7 +202,7 @@ class VariableResolver(object):
                     _, last_defined, last_used = obj_and_vars_list[-1]
                 obj_and_vars_list.append((obj, last_defined, last_used))
         return obj_and_vars_list
-    
+
     def update_resolved_vars_dict(self, vars_dict, var_name, var_value):
         def _recursive_update(d, keys, value):
             if not isinstance(d, dict):
@@ -235,7 +234,7 @@ def make_value_placeholder(var_name: str):
     if "." in var_name:
         var_name = var_name.replace(".", "_")
     return "{{ " + var_name + " }}"
-    
+
 
 def flatten_vars_dict(vars_dict: dict, _prefix: str = ""):
     flat_vars_dict = {}
@@ -250,77 +249,6 @@ def flatten_vars_dict(vars_dict: dict, _prefix: str = ""):
             flat_key = f"{_prefix}{k}"
             flat_vars_dict.update({flat_key: v})
     return flat_vars_dict
-
-
-def extract_variable_names(txt):
-    if not variable_block_re.search(txt):
-        return []
-    found_var_blocks = variable_block_re.findall(txt)
-    blocks = []
-    for b in found_var_blocks:
-        if "lookup(" in b.replace(" ", ""):
-            continue
-        parts = b.split("|")
-        var_name = ""
-        default_var_name = ""
-        for i, p in enumerate(parts):
-            if i == 0:
-                var_name = p.replace("{{", "").replace("}}", "")
-                if " if " in var_name and " else " in var_name:
-                    # this block is not just a variable, but an expression
-                    # we need to split this with a space to get its elements
-                    skip_elements = ["if", "else", "+", "is", "defined"]
-                    sub_parts = var_name.split(" ")
-                    for sp in sub_parts:
-                        if not sp:
-                            continue
-                        if sp and sp in skip_elements:
-                            continue
-                        if sp and sp[0] in ['"', "'"]:
-                            continue
-                        var_name = sp
-                        break
-                var_name = var_name.replace(" ", "")
-                if "lookup(" in var_name and "first_found" in var_name:
-                    var_name = var_name.split(",")[-1].replace(")", "")
-                if var_name and var_name[0] == "(":
-                    var_name = var_name.split(")")[0].replace("(", "")
-                if "+" in var_name:
-                    sub_parts = var_name.split("+")
-                    for sp in sub_parts:
-                        if not sp:
-                            continue
-                        if sp and sp[0] in ['"', "'"]:
-                            continue
-                        var_name = sp
-                        break
-                if "[" in var_name and "." not in var_name:
-                    # extract dict/list name
-                    dict_pattern = r'(\w+)\[(\'|").*(\'|")\]'
-                    match = re.search(dict_pattern, var_name)
-                    if match:
-                        matched_str = match.group(1)
-                        var_name = matched_str.split("[")[0]
-                    list_pattern = r'(\w+)\[\-?\d+\]'
-                    match = re.search(list_pattern, var_name)
-                    if match:
-                        matched_str = match.group(1)
-                        var_name = matched_str.split("[")[0]
-            else:
-                if "default(" in p and ")" in p:
-                    default_var = p.replace("}}", "").replace("default(", "").replace(")", "").replace(" ", "")
-                    if not default_var.startswith('"') and not default_var.startswith("'") and not re.compile(r"[0-9].*").match(default_var):
-                        default_var_name = default_var
-        tmp_b = {
-            "original": b,
-        }
-        if var_name == "":
-            continue
-        tmp_b["name"] = var_name
-        if default_var_name != "":
-            tmp_b["default"] = default_var_name
-        blocks.append(tmp_b)
-    return blocks
 
 
 def resolved_vars_contains(resolved_vars, new_var):
@@ -569,7 +497,6 @@ class VariableContext:
             registered_vars=copy.copy(self.registered_vars),
         )
         # return copy.deepcopy(self)
-
 
 
 def resolve_module_options(context: VariableContext, task: Task):

@@ -790,6 +790,7 @@ class SagePipeline(object):
 
                 ari_metadata = findings.metadata.copy()
                 dependencies = findings.dependencies.copy()
+                ari_metadata["source"] = source
                 self.scan_records["ari_metadata"] = ari_metadata
                 self.scan_records["dependencies"] = dependencies
 

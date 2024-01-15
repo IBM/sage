@@ -20,7 +20,7 @@ import json
 import time
 import argparse
 from sage_scan.tools.src_rebuilder import write_result, prepare_source_dir
-from ari_core.scanner import ARIScanner, Config
+from ansible_parser.scanner import ARIScanner, Config
 
 
 if __name__ == "__main__":

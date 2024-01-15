@@ -14,13 +14,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ari_core.finder import (
+from ansible_parser.finder import (
     find_all_ymls,
     label_yml_file,
     get_role_info_from_path,
     get_project_info_for_file,
 )
-from ari_core.risk_detector import load_rules
+from ansible_parser.risk_detector import load_rules
 import re
 import os
 import pathlib

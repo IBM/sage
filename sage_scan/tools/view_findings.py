@@ -19,9 +19,9 @@ import os
 import json
 import argparse
 from treelib import Node, Tree
-from ari_core.findings import Findings
-from ari_core.models import Collection, Module, Playbook, Play, RoleInPlay, Repository, Role, TaskFile, Task
-from ari_core.keyutil import get_obj_type
+from ansible_parser.findings import Findings
+from ansible_parser.models import Collection, Module, Playbook, Play, RoleInPlay, Repository, Role, TaskFile, Task
+from ansible_parser.keyutil import get_obj_type
 
 
 

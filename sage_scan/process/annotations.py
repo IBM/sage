@@ -18,7 +18,7 @@ from sage_scan.models import (
     Task,
     Module,
 )
-from ari_core.models import (
+from ansible_parser.models import (
     ExecutableType,
     Module as ARIModule,
     ActionGroupMetadata,

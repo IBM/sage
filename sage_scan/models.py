@@ -19,7 +19,7 @@ from typing import List, Dict
 import logging
 import json
 import jsonpickle
-from ari_core.models import (
+from ansible_parser.models import (
     Module as ARIModule,
     Task as ARITask,
     TaskFile as ARITaskFile,
@@ -32,8 +32,8 @@ from ari_core.models import (
     Annotation,
     BecomeInfo,
 )
-from ari_core.findings import Findings as ARIFindings
-from ari_core.keyutil import get_obj_type, key_delimiter
+from ansible_parser.findings import Findings as ARIFindings
+from ansible_parser.keyutil import get_obj_type, key_delimiter
 
 
 logger = logging.getLogger(__name__)

@@ -21,7 +21,7 @@ from datetime import date, time
 from dataclasses import dataclass, field
 import ruamel.yaml
 
-from ari_core.models import (
+from ansible_parser.models import (
     AnsibleRunContext,
     RunTargetType,
     Rule,
@@ -37,7 +37,7 @@ from ari_core.models import (
     Variable,
     VariableType,
 )
-import ari_core.yaml as ariyaml
+import ansible_parser.yaml as ariyaml
 import os
 import re
 

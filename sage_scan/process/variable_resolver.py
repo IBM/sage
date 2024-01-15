@@ -35,7 +35,7 @@ from sage_scan.process.annotations import (
     VARIABLES_USED_ANNOTATION_KEY,
     is_loop_var,
 )
-from ari_core.models import (
+from ansible_parser.models import (
     Variable,
     VariableType,
     BecomeInfo,

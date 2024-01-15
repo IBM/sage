@@ -16,15 +16,15 @@
 
 from dataclasses import dataclass, field
 import datetime
-from ari_core.scanner import ARIScanner, config, Config
-from ari_core.models import NodeResult, RuleResult, AnsibleRunContext, Object
-from ari_core.finder import (
+from ansible_parser.scanner import ARIScanner, config, Config
+from ansible_parser.models import NodeResult, RuleResult, AnsibleRunContext, Object
+from ansible_parser.finder import (
     find_all_files,
     label_yml_file,
     get_role_info_from_path,
     get_project_info_for_file,
 )
-from ari_core.utils import escape_local_path
+from ansible_parser.utils import escape_local_path
 from sage_scan.utils import get_rule_id_list, get_git_version, strtobool
 from sage_scan.models import convert_to_sage_obj, SageProject
 from sage_scan.variable_container import set_vc

@@ -277,6 +277,7 @@ class Play(SageObject):
     pre_tasks: list = field(default_factory=list)
     tasks: list = field(default_factory=list)
     post_tasks: list = field(default_factory=list)
+    handlers: list = field(default_factory=list)
     # not actual Role, but RoleInPlay defined in this playbook
     roles: list = field(default_factory=list)
     module_defaults: dict = field(default_factory=dict)
